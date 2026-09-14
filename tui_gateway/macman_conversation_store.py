@@ -18,6 +18,7 @@ from typing import TypeVar
 
 _T = TypeVar("_T")
 _SOURCES = frozenset({"user", "worker", "trigger"})
+_ROLES = frozenset({"user", "assistant"})
 
 
 def _required_text(value: object, name: str) -> str:
@@ -111,6 +112,45 @@ class ConversationInboxStore:
                 """
                 CREATE INDEX IF NOT EXISTS macman_conversation_inbox_ready
                 ON macman_conversation_inbox (owner_id, state, source, id)
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS macman_conversation_turns (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    owner_id TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    message_id TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    created_at REAL NOT NULL,
+                    UNIQUE (owner_id, role, source, message_id)
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS macman_conversation_turns_history
+                ON macman_conversation_turns (owner_id, id)
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS macman_conversation_workers (
+                    owner_id TEXT NOT NULL,
+                    worker_id TEXT NOT NULL,
+                    task TEXT NOT NULL,
+                    origin_message_id TEXT NOT NULL,
+                    state TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    summary TEXT NOT NULL DEFAULT '',
+                    run_sequence INTEGER NOT NULL DEFAULT 1,
+                    created_at REAL NOT NULL,
+                    updated_at REAL NOT NULL,
+                    completed_at REAL,
+                    follow_up_expires_at REAL,
+                    PRIMARY KEY (owner_id, worker_id)
+                )
                 """
             )
         finally:
@@ -342,3 +382,178 @@ class ConversationInboxStore:
             (owner, bounded_limit),
         )
         return [_record(row) for row in rows]
+
+    def record_turn(
+        self,
+        owner_id: str,
+        *,
+        role: str,
+        source: str,
+        message_id: str,
+        content: str,
+        now: float | None = None,
+    ) -> bool:
+        """Append one visible or internal hot-path turn, idempotently."""
+        owner = _required_text(owner_id, "owner_id")
+        if role not in _ROLES:
+            raise ValueError("role must be user or assistant")
+        if source not in _SOURCES | {"system"}:
+            raise ValueError("source must be user, worker, trigger, or system")
+        identity = _required_text(message_id, "message_id")
+        text = _required_text(content, "content")
+        stamp = _timestamp(now)
+
+        def operation(connection: sqlite3.Connection) -> bool:
+            existing = connection.execute(
+                """
+                SELECT content FROM macman_conversation_turns
+                WHERE owner_id=? AND role=? AND source=? AND message_id=?
+                """,
+                (owner, role, source, identity),
+            ).fetchone()
+            if existing is not None:
+                if existing["content"] != text:
+                    raise ValueError("turn identity was already recorded with different content")
+                return False
+            connection.execute(
+                """
+                INSERT INTO macman_conversation_turns
+                    (owner_id, role, source, message_id, content, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (owner, role, source, identity, text, stamp),
+            )
+            return True
+
+        return self._write(operation)
+
+    def start_worker(
+        self,
+        owner_id: str,
+        worker_id: str,
+        *,
+        task: str,
+        origin_message_id: str,
+        now: float | None = None,
+    ) -> None:
+        owner = _required_text(owner_id, "owner_id")
+        identity = _required_text(worker_id, "worker_id")
+        worker_task = _required_text(task, "task")
+        origin = _required_text(origin_message_id, "origin_message_id")
+        stamp = _timestamp(now)
+
+        def operation(connection: sqlite3.Connection) -> None:
+            connection.execute(
+                """
+                INSERT INTO macman_conversation_workers
+                    (owner_id, worker_id, task, origin_message_id, state, status,
+                     created_at, updated_at)
+                VALUES (?, ?, ?, ?, 'running', 'running', ?, ?)
+                """,
+                (owner, identity, worker_task, origin, stamp, stamp),
+            )
+
+        self._write(operation)
+
+    def finish_worker(
+        self,
+        owner_id: str,
+        worker_id: str,
+        *,
+        status: str,
+        summary: str,
+        now: float | None = None,
+        follow_up_seconds: float = 300,
+    ) -> bool:
+        if status not in {"complete", "failed"}:
+            raise ValueError("worker status must be complete or failed")
+        owner = _required_text(owner_id, "owner_id")
+        identity = _required_text(worker_id, "worker_id")
+        text = str(summary or "").strip()
+        stamp = _timestamp(now)
+        window = float(follow_up_seconds)
+        if not math.isfinite(window) or window < 0:
+            raise ValueError("follow_up_seconds must be finite and non-negative")
+        expires = stamp + window if status == "complete" and window > 0 else None
+
+        def operation(connection: sqlite3.Connection) -> bool:
+            cursor = connection.execute(
+                """
+                UPDATE macman_conversation_workers
+                SET state='done', status=?, summary=?, updated_at=?, completed_at=?,
+                    follow_up_expires_at=?
+                WHERE owner_id=? AND worker_id=? AND state='running'
+                """,
+                (status, text, stamp, stamp, expires, owner, identity),
+            )
+            return cursor.rowcount == 1
+
+        return self._write(operation)
+
+    def claim_follow_up(
+        self,
+        owner_id: str,
+        worker_id: str,
+        *,
+        now: float | None = None,
+    ) -> bool:
+        """Atomically reopen one owned completed worker inside its follow-up window."""
+        owner = _required_text(owner_id, "owner_id")
+        identity = _required_text(worker_id, "worker_id")
+        stamp = _timestamp(now)
+
+        def operation(connection: sqlite3.Connection) -> bool:
+            cursor = connection.execute(
+                """
+                UPDATE macman_conversation_workers
+                SET state='running', status='running', summary='', run_sequence=run_sequence+1,
+                    updated_at=?, completed_at=NULL, follow_up_expires_at=NULL
+                WHERE owner_id=? AND worker_id=? AND state='done' AND status='complete'
+                  AND follow_up_expires_at>?
+                """,
+                (stamp, owner, identity, stamp),
+            )
+            return cursor.rowcount == 1
+
+        return self._write(operation)
+
+    def conversation_context(
+        self,
+        owner_id: str,
+        *,
+        limit: int = 24,
+        now: float | None = None,
+    ) -> dict:
+        owner = _required_text(owner_id, "owner_id")
+        _, bounded_limit = _settings(0, limit)
+        stamp = _timestamp(now)
+        rows = self._read_all(
+            """
+            SELECT role, source, message_id, content, created_at
+            FROM macman_conversation_turns
+            WHERE owner_id=? ORDER BY id DESC LIMIT ?
+            """,
+            (owner, bounded_limit),
+        )
+        messages = [dict(row) for row in reversed(rows)]
+        active = self._read_all(
+            """
+            SELECT worker_id, task, status FROM macman_conversation_workers
+            WHERE owner_id=? AND state='running' ORDER BY updated_at, worker_id
+            """,
+            (owner,),
+        )
+        follow_up = self._read_all(
+            """
+            SELECT worker_id, task, status, summary, follow_up_expires_at AS expires_at
+            FROM macman_conversation_workers
+            WHERE owner_id=? AND state='done' AND status='complete'
+              AND follow_up_expires_at>? ORDER BY completed_at DESC, worker_id
+            """,
+            (owner, stamp),
+        )
+        return {
+            "messages": messages,
+            "active_workers": [dict(row) for row in active],
+            "follow_up_workers": [dict(row) for row in follow_up],
+        }
