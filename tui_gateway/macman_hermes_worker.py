@@ -46,9 +46,16 @@ class HermesWorkerBridge:
         self._id_factory = id_factory
 
     @staticmethod
-    def _result(request: dict, worker_id: str, *, status: str, content: str) -> dict:
+    def _result(
+        request: dict,
+        worker_id: str,
+        *,
+        status: str,
+        content: str,
+        model_messages: list[dict] | None = None,
+    ) -> dict:
         origin_message_id = str(request.get("origin_message_id") or "unknown")
-        return {
+        envelope = {
             "source": "worker",
             "channel": str(request.get("channel") or "desktop"),
             "thread_id": str(request.get("thread_id") or ""),
@@ -59,6 +66,9 @@ class HermesWorkerBridge:
             "origin_message_id": origin_message_id,
             "status": status,
         }
+        if model_messages is not None:
+            envelope["_model_messages"] = model_messages
+        return envelope
 
     def delegate(self, request: dict) -> str:
         text = request.get("user_content")
@@ -92,8 +102,19 @@ class HermesWorkerBridge:
                         run_kwargs["conversation_history"] = history
                     result = agent.run_conversation(**run_kwargs)
                     final = _final_text(result)
+                    model_messages = result.get("messages") if isinstance(result, dict) else None
+                    if not isinstance(model_messages, list) or any(
+                        not isinstance(item, dict) for item in model_messages
+                    ):
+                        model_messages = None
                     if final:
-                        envelope = self._result(request, worker_id, status="complete", content=final)
+                        envelope = self._result(
+                            request,
+                            worker_id,
+                            status="complete",
+                            content=final,
+                            model_messages=model_messages,
+                        )
                     else:
                         envelope = self._result(
                             request,
