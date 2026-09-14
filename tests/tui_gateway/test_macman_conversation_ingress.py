@@ -91,6 +91,9 @@ def test_store_serializes_admission_and_caps_each_destination_batch(tmp_path):
         assert store.claim("person", "parallel", now=100) == []
         assert store.claim("other", "other-owner", now=101)
         assert store.settle("person", "desktop", state="handled", now=101)
+        overflow = store.claim("person", "desktop-overflow", now=101)
+        assert [row["envelope"]["message_id"] for row in overflow] == ["5"]
+        assert store.settle("person", "desktop-overflow", state="handled", now=101)
         phone = store.claim("person", "phone-turn", now=101)
         assert [row["envelope"]["message_id"] for row in phone] == ["phone"]
 
