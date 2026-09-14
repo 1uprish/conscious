@@ -2141,6 +2141,18 @@ export interface PromptSubmitResult {
   turn_isolation?: boolean | null
 }
 export type PromptSubmitStatus = 'streaming' | 'queued' | 'steered' | 'redirected'
+/** A desktop user message admitted to MacMan's durable Finn-style hot path. */
+export interface ConversationSubmitParams {
+  session_id: string
+  profile?: string | null
+  text: string
+  client_message_id: string
+}
+export interface ConversationSubmitResult {
+  status: string
+  client_message_id: string
+  dispatch_id: string
+}
 export interface ClipboardPasteParams {
   session_id: string
   profile?: string | null
@@ -4220,6 +4232,8 @@ export interface RpcMethods {
   'connectors.list': { params: ConnectorsListParams; result: ConnectorsListResult }
   /** The current snapshot of one open operation on an owned session. */
   'connectors.operation.status': { params: ConnectionOperationParams; result: ConnectionOperationStatus }
+  /** Accept a desktop message into MacMan's serialized conversational hot path. */
+  'conversation.submit': { params: ConversationSubmitParams; result: ConversationSubmitResult }
   /** List/add/remove/pause/resume cron jobs in the (optionally profile-scoped) cron store. */
   'cron.manage': { params: CronManageParams; result: CronManageResult }
   /** Block/unblock NEW spawns globally (active children keep running); returns the new state. */
@@ -4624,6 +4638,7 @@ export const RPC_METHODS = [
   'connectors.connect',
   'connectors.list',
   'connectors.operation.status',
+  'conversation.submit',
   'cron.manage',
   'delegation.pause',
   'delegation.status',

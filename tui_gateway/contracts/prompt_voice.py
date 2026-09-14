@@ -72,6 +72,27 @@ method("prompt.submit", params=PromptSubmitParams, result=PromptSubmitResult,
        doc="Send a user turn to a live session; busy sessions queue / steer / redirect instead of refusing.")
 
 
+class ConversationSubmitParams(SessionParams):
+    """A desktop user message admitted to MacMan's durable Finn-style hot path."""
+
+    text: str
+    client_message_id: str
+
+
+class ConversationSubmitResult(Result):
+    status: str
+    client_message_id: str
+    dispatch_id: str
+
+
+method(
+    "conversation.submit",
+    params=ConversationSubmitParams,
+    result=ConversationSubmitResult,
+    doc="Accept a desktop message into MacMan's serialized conversational hot path.",
+)
+
+
 # ── attachments ───────────────────────────────────────────────────────────────────────────────
 
 

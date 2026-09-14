@@ -601,6 +601,24 @@
       }
     },
     {
+      "name": "conversation.submit",
+      "summary": "Accept a desktop message into MacMan's serialized conversational hot path.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/ConversationSubmitParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/ConversationSubmitResult"
+        }
+      }
+    },
+    {
       "name": "cron.manage",
       "summary": "List/add/remove/pause/resume cron jobs in the (optionally profile-scoped) cron store.",
       "params": [
@@ -9084,6 +9102,67 @@
           "capabilities"
         ],
         "title": "ControllerScope",
+        "type": "object"
+      },
+      "ConversationSubmitParams": {
+        "additionalProperties": false,
+        "description": "A desktop user message admitted to MacMan's durable Finn-style hot path.",
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "client_message_id": {
+            "title": "Client Message Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "text",
+          "client_message_id"
+        ],
+        "title": "ConversationSubmitParams",
+        "type": "object"
+      },
+      "ConversationSubmitResult": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "client_message_id": {
+            "title": "Client Message Id",
+            "type": "string"
+          },
+          "dispatch_id": {
+            "title": "Dispatch Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "client_message_id",
+          "dispatch_id"
+        ],
+        "title": "ConversationSubmitResult",
         "type": "object"
       },
       "CorrectionStatus": {

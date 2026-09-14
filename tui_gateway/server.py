@@ -167,6 +167,7 @@ _LONG_HANDLERS = frozenset({
     "setup.runtime_check", "setup.status", "voice.toggle", "voice.record", "voice.tts", "wake.start",
     "wake.status", "session.active_list", "session.branch", "session.compress", "session.list",
     "session.resume", "session.workspace.move", "shell.exec", "skills.manage", "slash.exec",
+    "conversation.submit",
     "command.dispatch",  # /goal draft invokes the auxiliary model; never block the RPC reader
 })
 
@@ -3263,7 +3264,7 @@ from . import (  # noqa: E402
     methods_projects as _methods_projects, methods_session_foreign as _methods_session_foreign,
     methods_session_control as _methods_session_control, methods_subagents as _methods_subagents,
     methods_vault as _methods_vault, methods_free_tier as _methods_free_tier,
-    methods_connectors as _methods_connectors)
+    methods_connectors as _methods_connectors, methods_conversation as _methods_conversation)
 
 for _m in (
     _session_transports, _session_reaper, _session_lifecycle, _session_workdir, _compute_host_bridge, _model_switch,
@@ -3273,6 +3274,7 @@ for _m in (
     _methods_browser_control, _methods_session, _methods_prompt, _methods_config,
     _methods_config_set, _methods_complete, _methods_tools, _methods_profiles, _methods_images,
     _methods_bot_relay, _prompt_turn, _billing_view, _methods_projects, _methods_session_foreign,
-    _methods_session_control, _methods_subagents, _methods_vault, _methods_free_tier, _methods_connectors):
+    _methods_session_control, _methods_subagents, _methods_vault, _methods_free_tier, _methods_connectors,
+    _methods_conversation):
     _m.register(sys.modules[__name__])
 del _m
