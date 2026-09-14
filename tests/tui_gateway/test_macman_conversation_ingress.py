@@ -250,6 +250,10 @@ def test_store_exposes_only_owned_completed_workers_during_the_follow_up_window(
         store.finish_worker(
             "person", "worker-one", status="complete", summary="Which note?", now=102,
             follow_up_seconds=300,
+            model_messages=[
+                {"role": "user", "content": "open Notes"},
+                {"role": "assistant", "content": "Which note?"},
+            ],
         )
         follow_up = store.conversation_context("person", now=103)["follow_up_workers"]
         assert follow_up == [{
@@ -259,6 +263,10 @@ def test_store_exposes_only_owned_completed_workers_during_the_follow_up_window(
         assert store.claim_follow_up("other", "worker-one", now=103) is False
         assert store.claim_follow_up("person", "worker-one", now=403) is False
         assert store.claim_follow_up("person", "worker-one", now=104) is True
+        assert store.get_worker_history("person", "worker-one") == [
+            {"role": "user", "content": "open Notes"},
+            {"role": "assistant", "content": "Which note?"},
+        ]
         assert store.conversation_context("person", now=105)["active_workers"] == [{
             "worker_id": "worker-one", "task": "open Notes", "status": "running",
         }]
