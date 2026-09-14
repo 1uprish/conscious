@@ -182,7 +182,14 @@ def test_completed_worker_follow_up_resumes_the_same_hermes_transcript():
             return None
 
     def make_agent(worker_id):
-        agent = FakeAgent({"final_response": "The project note is open"})
+        agent = FakeAgent({
+            "final_response": "The project note is open",
+            "messages": [
+                *prior,
+                {"role": "user", "content": "open Notes please"},
+                {"role": "assistant", "content": "The project note is open"},
+            ],
+        })
         agents.append((worker_id, agent))
         return agent
 
@@ -208,3 +215,6 @@ def test_completed_worker_follow_up_resumes_the_same_hermes_transcript():
         "conversation_history": prior,
     }]
     assert results[0]["message_id"] == "worker-one:complete:user-two"
+    assert results[0]["_model_messages"][-1] == {
+        "role": "assistant", "content": "The project note is open",
+    }
