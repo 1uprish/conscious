@@ -100,7 +100,7 @@ def test_delegate_returns_immediately_then_runs_exact_request_in_an_isolated_her
         "source": "worker",
         "channel": "desktop",
         "thread_id": "chat-one",
-        "message_id": "worker-one:complete",
+        "message_id": "worker-one:complete:user-one",
         "content": "Notes is open",
         "attachments": [],
         "worker_id": "worker-one",
@@ -132,7 +132,7 @@ def test_worker_failure_is_a_truthful_internal_result_not_a_false_completion():
     assert result_ready.wait(timeout=2)
 
     assert results[0]["status"] == "failed"
-    assert results[0]["message_id"] == "worker-failed:failed"
+    assert results[0]["message_id"] == "worker-failed:failed:user-one"
     assert "provider unavailable" in results[0]["content"]
     assert "completed" not in results[0]["content"].lower()
 
@@ -162,3 +162,49 @@ def test_empty_hermes_final_is_reported_as_failure_instead_of_inventing_success(
 
     assert results[0]["status"] == "failed"
     assert results[0]["content"] == "Hermes finished without a result."
+
+
+def test_completed_worker_follow_up_resumes_the_same_hermes_transcript():
+    threads = []
+    agents = []
+    started = []
+    results = []
+    prior = [
+        {"role": "user", "content": "open Notes"},
+        {"role": "assistant", "content": "Which note should I open?"},
+    ]
+
+    class Scope:
+        def __enter__(self):
+            return None
+
+        def __exit__(self, *_args):
+            return None
+
+    def make_agent(worker_id):
+        agent = FakeAgent({"final_response": "The project note is open"})
+        agents.append((worker_id, agent))
+        return agent
+
+    bridge = HermesWorkerBridge(
+        make_agent=make_agent,
+        worker_scope=lambda _worker_id: Scope(),
+        build_message=lambda _agent, text, _attachments: text,
+        load_history=lambda worker_id: prior if worker_id == "worker-one" else [],
+        on_started=lambda request, worker_id, resumed: started.append((request, worker_id, resumed)),
+        on_result=results.append,
+        thread_factory=lambda target: threads.append(ControlledThread(target)) or threads[-1],
+        id_factory=lambda: (_ for _ in ()).throw(AssertionError("must reuse worker id")),
+    )
+    request = {**_request(), "worker_id": "worker-one", "origin_message_id": "user-two"}
+
+    assert bridge.delegate(request) == "worker-one"
+    assert started == [(request, "worker-one", True)]
+    threads[0].target()
+
+    assert agents[0][1].calls == [{
+        "user_message": "open Notes please",
+        "task_id": "worker-one",
+        "conversation_history": prior,
+    }]
+    assert results[0]["message_id"] == "worker-one:complete:user-two"
