@@ -31,6 +31,8 @@ class HermesWorkerBridge:
         worker_scope: Callable[[str], Any],
         build_message: Callable[[Any, str, list[dict]], Any],
         on_result: Callable[[dict], object],
+        load_history: Callable[[str], list[dict]] | None = None,
+        on_started: Callable[[dict, str, bool], object] | None = None,
         thread_factory: Callable[[Callable[[], None]], Any] = _thread,
         id_factory: Callable[[], str] = lambda: f"macman_{uuid.uuid4().hex[:12]}",
     ):
@@ -38,20 +40,23 @@ class HermesWorkerBridge:
         self._worker_scope = worker_scope
         self._build_message = build_message
         self._on_result = on_result
+        self._load_history = load_history
+        self._on_started = on_started
         self._thread_factory = thread_factory
         self._id_factory = id_factory
 
     @staticmethod
     def _result(request: dict, worker_id: str, *, status: str, content: str) -> dict:
+        origin_message_id = str(request.get("origin_message_id") or "unknown")
         return {
             "source": "worker",
             "channel": str(request.get("channel") or "desktop"),
             "thread_id": str(request.get("thread_id") or ""),
-            "message_id": f"{worker_id}:{status}",
+            "message_id": f"{worker_id}:{status}:{origin_message_id}",
             "content": content,
             "attachments": [],
             "worker_id": worker_id,
-            "origin_message_id": str(request.get("origin_message_id") or ""),
+            "origin_message_id": origin_message_id,
             "status": status,
         }
 
@@ -62,18 +67,30 @@ class HermesWorkerBridge:
         attachments = request.get("attachments", [])
         if not isinstance(attachments, list):
             raise ValueError("delegated attachments must be a list")
-        worker_id = self._id_factory()
+        requested_worker_id = request.get("worker_id")
+        if requested_worker_id is not None and (
+            not isinstance(requested_worker_id, str) or not requested_worker_id.strip()
+        ):
+            raise ValueError("worker_id must be non-empty text when provided")
+        resumed = requested_worker_id is not None
+        worker_id = requested_worker_id.strip() if resumed else self._id_factory()
+        if self._on_started is not None:
+            self._on_started(request, worker_id, resumed)
 
         def run() -> None:
             agent = None
             try:
                 with self._worker_scope(worker_id):
+                    history = self._load_history(worker_id) if resumed and self._load_history else []
                     agent = self._make_agent(worker_id)
                     # The conversational layer, not Hermes' raw stream, owns visible prose.
                     agent.stream_delta_callback = None
                     agent.interim_assistant_callback = None
                     message = self._build_message(agent, text, attachments)
-                    result = agent.run_conversation(user_message=message, task_id=worker_id)
+                    run_kwargs = {"user_message": message, "task_id": worker_id}
+                    if resumed:
+                        run_kwargs["conversation_history"] = history
+                    result = agent.run_conversation(**run_kwargs)
                     final = _final_text(result)
                     if final:
                         envelope = self._result(request, worker_id, status="complete", content=final)
