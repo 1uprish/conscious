@@ -7,6 +7,7 @@ import contextlib
 import threading
 from pathlib import Path
 
+from tui_gateway.macman_conversation_actions import ConversationActionError
 from tui_gateway.macman_conversation_ingress import ConversationIngress
 from tui_gateway.macman_conversation_planner import FinnConversationPlanner
 from tui_gateway.macman_conversation_runtime import MacManConversationRuntime
@@ -33,6 +34,8 @@ class MacManConversationActor:
             deliver=self._deliver,
             delegate=self._delegate,
             fail_open=self._fail_open,
+            conversation_context=self._conversation_context,
+            record_turn=self._record_turn,
         )
         self.ingress = ConversationIngress(self.store, owner_id, self._handle)
         self.loop = asyncio.new_event_loop()
@@ -99,6 +102,74 @@ class MacManConversationActor:
         sid, _session = self._attached()
         self.server._emit("message.start", sid)
         self.server._emit("message.complete", sid, {"text": text})
+
+    def _conversation_context(self, _envelope: dict) -> dict:
+        return self.store.conversation_context(self.owner_id)
+
+    @staticmethod
+    def _turn_content(envelope: dict) -> str:
+        text = str(envelope.get("content") or "").strip()
+        if text:
+            return text
+        names = []
+        for attachment in envelope.get("attachments", []):
+            if not isinstance(attachment, dict):
+                continue
+            name = attachment.get("name")
+            path = attachment.get("path")
+            if not isinstance(name, str) or not name.strip():
+                name = Path(path).name if isinstance(path, str) and path else "attachment"
+            names.append(name.strip())
+        return f"[attachments: {', '.join(names)}]"
+
+    def _record_turn(self, envelope: dict, result: dict) -> None:
+        message_id = str(envelope.get("message_id") or "").strip()
+        source = str(envelope.get("source") or "").strip()
+        self.store.record_turn(
+            self.owner_id,
+            role="user",
+            source=source,
+            message_id=message_id,
+            content=self._turn_content(envelope),
+        )
+        for index, text in enumerate(result.get("delivered", [])):
+            self.store.record_turn(
+                self.owner_id,
+                role="assistant",
+                source="system",
+                message_id=f"reply:{message_id}:{index}",
+                content=text,
+            )
+
+    def _load_worker_history(self, worker_id: str) -> list[dict]:
+        return self.store.get_worker_history(self.owner_id, worker_id)
+
+    def _worker_started(self, request: dict, worker_id: str, resumed: bool) -> None:
+        if resumed:
+            if not self.store.claim_follow_up(self.owner_id, worker_id):
+                raise ConversationActionError("worker is no longer available for follow-up")
+            return
+        self.store.start_worker(
+            self.owner_id,
+            worker_id,
+            task=request["task"],
+            origin_message_id=request["origin_message_id"],
+        )
+
+    def _settle_worker_result(self, envelope: dict) -> dict:
+        sanitized = dict(envelope)
+        model_messages = sanitized.pop("_model_messages", None)
+        worker_id = str(sanitized.get("worker_id") or "").strip()
+        persisted = self.store.finish_worker(
+            self.owner_id,
+            worker_id,
+            status=sanitized.get("status"),
+            summary=sanitized.get("content", ""),
+            model_messages=model_messages,
+        )
+        if not persisted:
+            raise RuntimeError(f"worker result has no running owner: {worker_id}")
+        return sanitized
 
     def _fail_open(self, envelope: dict) -> None:
         sid, session = self._attached()
@@ -169,7 +240,8 @@ class MacManConversationActor:
         def on_result(envelope: dict) -> None:
             if self._closed or not self.loop.is_running():
                 return
-            future = asyncio.run_coroutine_threadsafe(self.ingress.enqueue(envelope), self.loop)
+            result = self._settle_worker_result(envelope)
+            future = asyncio.run_coroutine_threadsafe(self.ingress.enqueue(result), self.loop)
             with contextlib.suppress(Exception):
                 future.result(timeout=5)
 
@@ -178,4 +250,6 @@ class MacManConversationActor:
             worker_scope=worker_scope,
             build_message=build_message,
             on_result=on_result,
+            load_history=self._load_worker_history,
+            on_started=self._worker_started,
         ).delegate(request)
