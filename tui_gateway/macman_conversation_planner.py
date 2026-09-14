@@ -29,6 +29,9 @@ Rules:
   the exact request in the same turn, then finish_turn.
 - Do not silently accept user-requested work.
 - Do not rewrite, narrow, expand, or invent requirements for delegated work.
+- Conversation context may list completed workers that can accept a follow-up. If the user's
+  message answers or continues one of those results, delegate with that exact worker_id.
+- Never invent a worker_id and never attach unrelated new work to an old worker.
 - Worker results are internal context, not user messages. Deliver their useful result naturally
   with send_message, or use wait when there is nothing worth surfacing.
 - Never claim work succeeded unless the worker result says it succeeded.
@@ -64,6 +67,10 @@ _DELEGATE = _tool(
     {
         "task": {"type": "string", "description": "A faithful executable rendering of the user's request."},
         "context": {"type": "string", "description": "Only context needed to preserve references or intent."},
+        "worker_id": {
+            "type": "string",
+            "description": "An exact follow-up worker ID supplied in private conversation context. Omit for new work.",
+        },
     },
     ["task"],
 )
@@ -116,13 +123,31 @@ class FinnConversationPlanner:
         return [_SEND_MESSAGE, *([_DELEGATE] if source == "user" else []), _WAIT, _FINISH]
 
     @staticmethod
-    def _turn_message(envelope: dict) -> str:
+    def _turn_message(envelope: dict, conversation_context: dict | None = None) -> str:
         source = envelope.get("source")
         content = str(envelope.get("content") or "")
         label = "human message" if source == "user" else f"internal {source} result"
-        return f"<{label}>\n{content}\n</{label}>"
+        sections = []
+        if conversation_context:
+            serialized = json.dumps(
+                conversation_context,
+                ensure_ascii=True,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            # This is short-term conversation continuity, not long-term memory. Keep the
+            # auxiliary prompt bounded even when a worker returns a large report.
+            sections.append(f"<private_conversation_context>\n{serialized[:12000]}\n</private_conversation_context>")
+        sections.append(f"<{label}>\n{content}\n</{label}>")
+        return "\n\n".join(sections)
 
-    async def plan(self, envelope: dict, *, main_runtime: dict) -> list[dict]:
+    async def plan(
+        self,
+        envelope: dict,
+        *,
+        main_runtime: dict,
+        conversation_context: dict | None = None,
+    ) -> list[dict]:
         source = envelope.get("source")
         if source not in {"user", "worker", "trigger"}:
             raise ConversationPlanError("unsupported conversation source")
@@ -131,7 +156,10 @@ class FinnConversationPlanner:
             main_runtime=main_runtime,
             messages=[
                 {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": self._turn_message(envelope)},
+                {
+                    "role": "user",
+                    "content": self._turn_message(envelope, conversation_context),
+                },
             ],
             temperature=0.2,
             max_tokens=320,

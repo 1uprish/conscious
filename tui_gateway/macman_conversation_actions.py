@@ -61,6 +61,9 @@ class ConversationActionExecutor:
                 context = arguments.get("context")
                 if context is not None and not isinstance(context, str):
                     raise ConversationActionError("delegate context must be text")
+                worker_id = arguments.get("worker_id")
+                if worker_id is not None:
+                    _non_empty_text(worker_id, "delegate worker_id")
             validated.append((name, arguments))
 
         finish_indexes = [index for index, (name, _args) in enumerate(validated) if name == "finish_turn"]
@@ -100,6 +103,10 @@ class ConversationActionExecutor:
                     "channel": envelope.get("channel", ""),
                     "thread_id": envelope.get("thread_id", ""),
                 }
+                if arguments.get("worker_id") is not None:
+                    request["worker_id"] = _non_empty_text(
+                        arguments.get("worker_id"), "delegate worker_id",
+                    )
                 worker_id = await _resolve(self._delegate(request))
                 delegated = True
             elif name == "wait":
