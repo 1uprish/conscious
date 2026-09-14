@@ -127,10 +127,12 @@ function Harness({
   selectedStoredSessionIdRef: selectedStoredSessionIdRefProp,
   storedSessionId,
   activeSessionId,
+  conversationLayerEnabled,
   createBackendSessionForSend
 }: {
   activeSessionIdRef?: MutableRefObject<string | null>
   busyRef?: MutableRefObject<boolean>
+  conversationLayerEnabled?: boolean
   getRoutedStoredSessionId?: () => null | string
   getRuntimeIdForStoredSession?: (storedSessionId: string) => null | string
   getRouteToken?: () => string
@@ -191,6 +193,7 @@ function Harness({
     activeSessionIdRef,
     branchCurrentSession: async () => true,
     busyRef: localBusyRef,
+    conversationLayerEnabled,
     createBackendSessionForSend: createBackendSessionForSend ?? (async () => RUNTIME_SESSION_ID),
     getRoutedStoredSessionId: getRoutedStoredSessionId ?? (() => null),
     getRuntimeIdForStoredSession: getRuntimeIdForStoredSession ?? (() => null),
@@ -1946,6 +1949,7 @@ describe('usePromptActions submit / queue drain semantics', () => {
     let handle: HarnessHandle | null = null
     await actRender(
       <Harness
+        conversationLayerEnabled
         onReady={h => (handle = h)}
         onSeedState={state => seeds.push(state)}
         refreshSessions={async () => undefined}

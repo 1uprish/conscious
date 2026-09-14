@@ -777,6 +777,24 @@ export function useSubmitPrompt(deps: SubmitPromptDeps) {
           ...(options?.fromQueue && { queued: true })
         })
 
+        const isOrdinaryVisibleChat =
+          options?.conversation === true &&
+          !interrupted &&
+          !options?.displayText &&
+          options?.displayKind !== 'hidden' &&
+          !options?.surface &&
+          !options?.fromQueue &&
+          !$hudMode.get()
+
+        const submitRequest = (targetId: string) =>
+          isOrdinaryVisibleChat
+            ? requestGateway(
+                'conversation.submit',
+                { client_message_id: optimisticId, session_id: targetId, text },
+                PROMPT_SUBMIT_REQUEST_TIMEOUT_MS
+              )
+            : requestGateway('prompt.submit', submitParams(targetId), PROMPT_SUBMIT_REQUEST_TIMEOUT_MS)
+
         // On sleep/wake the gateway's in-memory session may have been cleared
         // while the desktop app still holds the old session ID. The shared
         // resolver re-registers the stored session and retries once; every
@@ -791,9 +809,7 @@ export function useSubmitPrompt(deps: SubmitPromptDeps) {
             sessionId,
             recoverStoredSessionId,
             liveId =>
-              withSessionBusyRetry(() =>
-                requestGateway('prompt.submit', submitParams(liveId), PROMPT_SUBMIT_REQUEST_TIMEOUT_MS)
-              ),
+              withSessionBusyRetry(() => submitRequest(liveId)),
             {
               requestGateway,
               driftReason: sessionDriftReason,

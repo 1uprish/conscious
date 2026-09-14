@@ -230,6 +230,7 @@ interface PromptActionsOptions {
   activeSessionIdRef: MutableRefObject<string | null>
   busyRef: MutableRefObject<boolean>
   branchCurrentSession: () => Promise<boolean>
+  conversationLayerEnabled?: boolean
   createBackendSessionForSend: (preview?: string | null) => Promise<string | null>
   getRoutedStoredSessionId: () => null | string
   getRuntimeIdForStoredSession: (storedSessionId: string) => null | string
@@ -262,6 +263,7 @@ export function usePromptActions({
   activeSessionIdRef,
   busyRef,
   branchCurrentSession,
+  conversationLayerEnabled = false,
   createBackendSessionForSend,
   getRoutedStoredSessionId,
   getRuntimeIdForStoredSession,
@@ -619,9 +621,12 @@ export function usePromptActions({
         return true
       }
 
-      return await submitPromptText(rawText, options)
+      return await submitPromptText(
+        rawText,
+        conversationLayerEnabled ? { ...options, conversation: true } : options
+      )
     },
-    [executeSlashCommand, submitPromptText]
+    [conversationLayerEnabled, executeSlashCommand, submitPromptText]
   )
 
   const transcribeVoiceAudio = useCallback(

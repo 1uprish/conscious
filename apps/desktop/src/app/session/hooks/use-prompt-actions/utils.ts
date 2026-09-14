@@ -702,6 +702,10 @@ export function visibleUserIndexAtOrdinal(messages: readonly ChatMessage[], targ
 
 export interface SubmitTextOptions {
   attachments?: ComposerAttachment[]
+  /** Internal desktop routing marker. The public chat composer sets this for
+   *  ordinary turns; slash/queue/HUD/voice paths deliberately leave it off so
+   *  they retain Hermes' specialized prompt.submit semantics. */
+  conversation?: boolean
   /** The composer scope key that was actually loaded when this text was
    *  submitted (see use-composer-draft's activeQueueSessionKeyRef). Compared
    *  against the resolved submit target in sessionContextDrift — a mismatch

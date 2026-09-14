@@ -79,7 +79,9 @@ function routeParams(route: SessionProfileRoute, params: Record<string, unknown>
 }
 
 function promptSessionId(method: string, params: Record<string, unknown>): string {
-  return method === 'prompt.submit' && typeof params.session_id === 'string' ? params.session_id.trim() : ''
+  return (method === 'prompt.submit' || method === 'conversation.submit') && typeof params.session_id === 'string'
+    ? params.session_id.trim()
+    : ''
 }
 
 const TERMINAL_TURN_ACK_STATUSES = new Set(['complete', 'completed', 'error'])

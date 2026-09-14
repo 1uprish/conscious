@@ -737,6 +737,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     branchCurrentSession: branchInNewChat,
     busyRef,
     createBackendSessionForSend,
+    conversationLayerEnabled: true,
     getRoutedStoredSessionId,
     getRuntimeIdForStoredSession,
     getRouteToken,
