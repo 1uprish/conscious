@@ -87,6 +87,53 @@ def test_worker_turn_removes_delegate_from_the_available_tool_surface():
     asyncio.run(scenario())
 
 
+def test_current_conversation_and_follow_up_workers_are_private_planner_context():
+    async def scenario():
+        captured = {}
+
+        async def complete(**kwargs):
+            captured.update(kwargs)
+            return _response(
+                ("send_message", {"text": "got it"}),
+                ("delegate", {"task": "open the project note", "worker_id": "worker-one"}),
+                ("finish_turn", {}),
+            )
+
+        context = {
+            "messages": [
+                {"role": "user", "source": "user", "message_id": "one", "content": "open Notes"},
+                {"role": "assistant", "source": "system", "message_id": "reply", "content": "on it"},
+                {
+                    "role": "user", "source": "worker", "message_id": "worker-one:complete",
+                    "content": "Which note should I open?",
+                },
+            ],
+            "active_workers": [],
+            "follow_up_workers": [{
+                "worker_id": "worker-one", "task": "open Notes", "status": "complete",
+                "summary": "Which note should I open?", "expires_at": 402.0,
+            }],
+        }
+        planner = FinnConversationPlanner(complete=complete)
+        actions = await planner.plan(
+            _envelope("user", "the project note"),
+            main_runtime={"model": "m"},
+            conversation_context=context,
+        )
+
+        prompt = captured["messages"][-1]["content"]
+        assert "Which note should I open?" in prompt
+        assert "worker-one" in prompt
+        assert actions[1]["arguments"]["worker_id"] == "worker-one"
+        delegate_schema = next(
+            tool["function"]["parameters"]["properties"]
+            for tool in captured["tools"] if tool["function"]["name"] == "delegate"
+        )
+        assert "worker_id" in delegate_schema
+
+    asyncio.run(scenario())
+
+
 @pytest.mark.parametrize(
     ("response", "message"),
     [

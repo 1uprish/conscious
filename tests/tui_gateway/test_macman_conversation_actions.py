@@ -107,6 +107,34 @@ def test_missing_ack_gets_a_deterministic_receipt_before_delegation():
     asyncio.run(scenario())
 
 
+def test_follow_up_delegation_preserves_the_selected_worker_identity():
+    async def scenario():
+        requests = []
+        executor = ConversationActionExecutor(
+            deliver=lambda _text: None,
+            delegate=lambda request: requests.append(request) or request["worker_id"],
+        )
+
+        result = await executor.execute(
+            user_turn("the project note"),
+            [
+                {
+                    "name": "delegate",
+                    "arguments": {
+                        "task": "open the project note",
+                        "worker_id": "worker-one",
+                    },
+                },
+                {"name": "finish_turn", "arguments": {}},
+            ],
+        )
+
+        assert requests[0]["worker_id"] == "worker-one"
+        assert result["worker_id"] == "worker-one"
+
+    asyncio.run(scenario())
+
+
 def test_wait_is_silent_and_internal_results_cannot_delegate():
     async def scenario():
         delivered = []
