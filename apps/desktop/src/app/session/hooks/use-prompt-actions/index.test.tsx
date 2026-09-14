@@ -1939,6 +1939,34 @@ describe('usePromptActions submit / queue drain semantics', () => {
     vi.restoreAllMocks()
   })
 
+  it('admits an ordinary visible chat turn through the conversation gateway with its optimistic identity', async () => {
+    const seeds: Record<string, unknown>[] = []
+    const requestGateway = vi.fn(async () => ({}) as never)
+
+    let handle: HarnessHandle | null = null
+    await actRender(
+      <Harness
+        onReady={h => (handle = h)}
+        onSeedState={state => seeds.push(state)}
+        refreshSessions={async () => undefined}
+        requestGateway={requestGateway}
+      />
+    )
+
+    expect(await handle!.submitText('hey there')).toBe(true)
+    const optimistic = (seeds[0].messages as Array<{ id: string }>).at(-1)
+
+    expect(requestGateway).toHaveBeenCalledWith(
+      'conversation.submit',
+      {
+        client_message_id: optimistic?.id,
+        session_id: RUNTIME_SESSION_ID,
+        text: 'hey there'
+      },
+      1_800_000
+    )
+  })
+
   it('pins prompt.submit to the active registry connection when the remote session row is untagged', async () => {
     $connection.set({ connectionId: 'hermes01', mode: 'remote' } as never)
     setSessions([sessionInfo({ id: 'stored-remote', profile: 'default' })])

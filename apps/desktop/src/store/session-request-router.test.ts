@@ -459,6 +459,33 @@ describe('requestForSessionProfile', () => {
     vi.useRealTimers()
   })
 
+  it('keeps a routed conversation socket alive until its visible session settles', async () => {
+    const primary = makePrimary()
+    setPrimaryGateway(primary as never, 'default')
+    installDesktop()
+    const ambient = vi.fn(async () => ({ ambient: true }))
+
+    await requestForSessionProfile(
+      { connectionId: 'local', profile: 'default' },
+      ambient as never,
+      'conversation.submit',
+      { client_message_id: 'user-one', session_id: 'rt-conversation', text: 'hey' }
+    )
+
+    expect(secondaryGateways[0].close).not.toHaveBeenCalled()
+
+    vi.useFakeTimers()
+    secondaryGateways[0].emit({
+      payload: { running: false },
+      session_id: 'rt-conversation',
+      type: 'session.info'
+    })
+    await vi.advanceTimersByTimeAsync(500)
+
+    expect(secondaryGateways[0].close).toHaveBeenCalledOnce()
+    vi.useRealTimers()
+  })
+
   it.each(['queued', 'redirected', 'future-nonterminal'])(
     'retains a routed socket for non-terminal ACK status %s',
     async status => {
