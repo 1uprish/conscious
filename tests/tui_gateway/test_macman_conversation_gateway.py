@@ -86,3 +86,7 @@ def test_conversation_submit_rejects_empty_or_missing_message_identity(monkeypat
 
     assert empty["error"]["code"] == 4002
     assert missing_id["error"]["code"] == 4002
+
+
+def test_conversation_submit_never_blocks_the_gateway_reader():
+    assert "conversation.submit" in server._LONG_HANDLERS
