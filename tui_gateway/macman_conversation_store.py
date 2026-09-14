@@ -81,10 +81,12 @@ class ConversationInboxStore:
         return connection
 
     def _initialize(self) -> None:
+        from hermes_state_wal import apply_wal_with_fallback
+
         connection = sqlite3.connect(self.path, timeout=10, isolation_level=None)
         try:
-            connection.execute("PRAGMA journal_mode=WAL")
             connection.execute("PRAGMA busy_timeout=10000")
+            apply_wal_with_fallback(connection, db_label="macman/conversation.sqlite3")
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS macman_conversation_inbox (
