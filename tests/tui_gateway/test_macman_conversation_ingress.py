@@ -200,3 +200,65 @@ def test_cancelled_processing_claim_is_not_replayed_after_restart(tmp_path):
             assert calls == ["uncertain"]
 
     asyncio.run(scenario())
+
+
+def test_store_persists_bounded_conversation_context_separately_from_hermes_history(tmp_path):
+    path = tmp_path / "conversation.sqlite3"
+    with ConversationInboxStore(path) as store:
+        store.record_turn(
+            "person", role="user", source="user", message_id="one", content="open Notes", now=100,
+        )
+        store.record_turn(
+            "person", role="assistant", source="system", message_id="reply-one", content="on it", now=101,
+        )
+        store.record_turn(
+            "person", role="user", source="worker", message_id="worker-one:complete",
+            content="Which note should I open?", now=102,
+        )
+        # A transport retry must not duplicate the logical turn.
+        store.record_turn(
+            "person", role="user", source="worker", message_id="worker-one:complete",
+            content="Which note should I open?", now=103,
+        )
+
+    with ConversationInboxStore(path) as store:
+        context = store.conversation_context("person", limit=2, now=104)
+
+    assert context["messages"] == [
+        {
+            "role": "assistant", "source": "system", "message_id": "reply-one",
+            "content": "on it", "created_at": 101.0,
+        },
+        {
+            "role": "user", "source": "worker", "message_id": "worker-one:complete",
+            "content": "Which note should I open?", "created_at": 102.0,
+        },
+    ]
+    assert context["active_workers"] == []
+    assert context["follow_up_workers"] == []
+
+
+def test_store_exposes_only_owned_completed_workers_during_the_follow_up_window(tmp_path):
+    with ConversationInboxStore(tmp_path / "conversation.sqlite3") as store:
+        store.start_worker(
+            "person", "worker-one", task="open Notes", origin_message_id="one", now=100,
+        )
+        assert store.conversation_context("person", now=101)["active_workers"] == [{
+            "worker_id": "worker-one", "task": "open Notes", "status": "running",
+        }]
+
+        store.finish_worker(
+            "person", "worker-one", status="complete", summary="Which note?", now=102,
+            follow_up_seconds=300,
+        )
+        follow_up = store.conversation_context("person", now=103)["follow_up_workers"]
+        assert follow_up == [{
+            "worker_id": "worker-one", "task": "open Notes", "status": "complete",
+            "summary": "Which note?", "expires_at": 402.0,
+        }]
+        assert store.claim_follow_up("other", "worker-one", now=103) is False
+        assert store.claim_follow_up("person", "worker-one", now=403) is False
+        assert store.claim_follow_up("person", "worker-one", now=104) is True
+        assert store.conversation_context("person", now=105)["active_workers"] == [{
+            "worker_id": "worker-one", "task": "open Notes", "status": "running",
+        }]
