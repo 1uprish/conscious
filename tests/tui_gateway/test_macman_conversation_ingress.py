@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+import sqlite3
 
 import pytest
 
@@ -62,6 +63,18 @@ def test_store_deduplicates_and_persists_sliding_user_batches(tmp_path):
         assert store.settle("person", "turn-one", state="handled", now=101)
         internal = store.claim("person", "turn-two", now=101)
         assert [row["id"] for row in internal] == [worker["id"]]
+
+
+def test_store_uses_hermes_sqlite_safety_verdict(tmp_path):
+    from hermes_state_wal import is_sqlite_wal_reset_vulnerable
+
+    path = tmp_path / "conversation.sqlite3"
+    with ConversationInboxStore(path):
+        pass
+    with sqlite3.connect(path) as connection:
+        mode = connection.execute("PRAGMA journal_mode").fetchone()[0]
+
+    assert mode == ("delete" if is_sqlite_wal_reset_vulnerable() else "wal")
 
 
 def test_store_serializes_admission_and_caps_each_destination_batch(tmp_path):
