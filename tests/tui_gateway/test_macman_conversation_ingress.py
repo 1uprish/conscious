@@ -98,6 +98,25 @@ def test_store_serializes_admission_and_caps_each_destination_batch(tmp_path):
         assert [row["envelope"]["message_id"] for row in phone] == ["phone"]
 
 
+def test_store_never_coalesces_across_an_interleaved_destination(tmp_path):
+    with ConversationInboxStore(tmp_path / "conversation.sqlite3") as store:
+        store.accept("person", message("desktop-one"), now=100, grouping_window=0)
+        store.accept(
+            "person",
+            message("phone", channel="imessage"),
+            now=100,
+            grouping_window=0,
+        )
+        store.accept("person", message("desktop-two"), now=100, grouping_window=0)
+
+        first = store.claim("person", "first", now=100)
+        assert [row["envelope"]["message_id"] for row in first] == ["desktop-one"]
+        assert store.settle("person", "first", state="handled", now=100)
+
+        second = store.claim("person", "second", now=100)
+        assert [row["envelope"]["message_id"] for row in second] == ["phone"]
+
+
 def test_ingress_prioritizes_users_and_never_runs_two_turns_at_once(tmp_path):
     async def scenario():
         clock = [100.0]
