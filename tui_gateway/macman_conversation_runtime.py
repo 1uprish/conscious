@@ -28,18 +28,28 @@ class MacManConversationRuntime:
         deliver: Callable[[str], object],
         delegate: Callable[[dict], object],
         fail_open: Callable[[dict], object],
+        conversation_context: Callable[[dict], object] | None = None,
+        record_turn: Callable[[dict, dict], object] | None = None,
     ):
         self._planner = planner
         self._current_runtime = current_runtime
         self._deliver = deliver
         self._delegate = delegate
         self._fail_open = fail_open
+        self._conversation_context = conversation_context
+        self._record_turn = record_turn
 
     async def handle(self, envelope: dict) -> dict:
         try:
+            context = (
+                await _resolve(self._conversation_context(envelope))
+                if self._conversation_context is not None
+                else None
+            )
             actions = await self._planner.plan(
                 envelope,
                 main_runtime=self._current_runtime(),
+                conversation_context=context,
             )
         except Exception:
             return await self._fallback(envelope)
@@ -48,7 +58,9 @@ class MacManConversationRuntime:
                 deliver=self._deliver,
                 delegate=self._delegate,
             )
-            return await executor.execute(envelope, actions)
+            result = await executor.execute(envelope, actions)
+            await self._record(envelope, result)
+            return result
         except (ConversationPlanError, ConversationActionError):
             return await self._fallback(envelope)
 
@@ -59,5 +71,11 @@ class MacManConversationRuntime:
         text = str(envelope.get("content") or "").strip()
         if text:
             await _resolve(self._deliver(text))
-            return {"fallback": True, "delivered": [text]}
+            result = {"fallback": True, "delivered": [text]}
+            await self._record(envelope, result)
+            return result
         return {"fallback": True, "delivered": []}
+
+    async def _record(self, envelope: dict, result: dict) -> None:
+        if self._record_turn is not None:
+            await _resolve(self._record_turn(envelope, result))
