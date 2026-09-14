@@ -144,6 +144,7 @@ class ConversationInboxStore:
                     state TEXT NOT NULL,
                     status TEXT NOT NULL,
                     summary TEXT NOT NULL DEFAULT '',
+                    model_messages_json TEXT NOT NULL DEFAULT '[]',
                     run_sequence INTEGER NOT NULL DEFAULT 1,
                     created_at REAL NOT NULL,
                     updated_at REAL NOT NULL,
@@ -153,6 +154,15 @@ class ConversationInboxStore:
                 )
                 """
             )
+            worker_columns = {
+                row[1]
+                for row in connection.execute("PRAGMA table_info(macman_conversation_workers)")
+            }
+            if "model_messages_json" not in worker_columns:
+                connection.execute(
+                    "ALTER TABLE macman_conversation_workers "
+                    "ADD COLUMN model_messages_json TEXT NOT NULL DEFAULT '[]'"
+                )
         finally:
             connection.close()
 
@@ -464,6 +474,7 @@ class ConversationInboxStore:
         summary: str,
         now: float | None = None,
         follow_up_seconds: float = 300,
+        model_messages: list[dict] | None = None,
     ) -> bool:
         if status not in {"complete", "failed"}:
             raise ValueError("worker status must be complete or failed")
@@ -475,20 +486,44 @@ class ConversationInboxStore:
         if not math.isfinite(window) or window < 0:
             raise ValueError("follow_up_seconds must be finite and non-negative")
         expires = stamp + window if status == "complete" and window > 0 else None
+        messages = [] if model_messages is None else model_messages
+        if not isinstance(messages, list) or any(not isinstance(item, dict) for item in messages):
+            raise ValueError("model_messages must be a list of objects")
+        serialized_messages = json.dumps(
+            messages, ensure_ascii=True, sort_keys=True, allow_nan=False,
+        )
 
         def operation(connection: sqlite3.Connection) -> bool:
             cursor = connection.execute(
                 """
                 UPDATE macman_conversation_workers
-                SET state='done', status=?, summary=?, updated_at=?, completed_at=?,
-                    follow_up_expires_at=?
+                SET state='done', status=?, summary=?, model_messages_json=?, updated_at=?,
+                    completed_at=?, follow_up_expires_at=?
                 WHERE owner_id=? AND worker_id=? AND state='running'
                 """,
-                (status, text, stamp, stamp, expires, owner, identity),
+                (status, text, serialized_messages, stamp, stamp, expires, owner, identity),
             )
             return cursor.rowcount == 1
 
         return self._write(operation)
+
+    def get_worker_history(self, owner_id: str, worker_id: str) -> list[dict]:
+        owner = _required_text(owner_id, "owner_id")
+        identity = _required_text(worker_id, "worker_id")
+        rows = self._read_all(
+            """
+            SELECT model_messages_json FROM macman_conversation_workers
+            WHERE owner_id=? AND worker_id=? LIMIT 1
+            """,
+            (owner, identity),
+        )
+        if not rows:
+            return []
+        try:
+            messages = json.loads(rows[0]["model_messages_json"])
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return []
+        return messages if isinstance(messages, list) and all(isinstance(item, dict) for item in messages) else []
 
     def claim_follow_up(
         self,
