@@ -189,7 +189,7 @@
   },
   "build": {
     "electronVersion": "40.10.2",
-    "appId": "com.consciousgadgets.macman",
+    "appId": "com.macman.app",
     "productName": "MacMan",
     "executableName": "MacMan",
     "protocols": [
