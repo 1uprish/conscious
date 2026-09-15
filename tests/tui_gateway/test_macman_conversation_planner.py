@@ -60,6 +60,8 @@ def test_user_turn_uses_exact_finn_action_tools_and_current_hermes_runtime():
         assert [action["name"] for action in actions] == ["send_message", "delegate", "finish_turn"]
         assert captured["main_runtime"] is runtime
         assert captured["task"] == "conversation"
+        assert captured["tool_choice"] == "required"
+        assert captured["reasoning_config"] == {"enabled": False}
         assert {tool["function"]["name"] for tool in captured["tools"]} == {
             "send_message", "delegate", "wait", "finish_turn"
         }
