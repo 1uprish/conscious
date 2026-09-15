@@ -290,6 +290,276 @@ body,
   font-size: 11px;
 }
 
+.mm-page-surface {
+  width: min(820px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 38px 0 64px;
+}
+
+.mm-page-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.mm-page-heading h2,
+.mm-about-page h2 {
+  margin: 2px 0 6px;
+  font-size: 26px;
+  font-weight: 710;
+  letter-spacing: -0.035em;
+  line-height: 32px;
+}
+
+.mm-page-heading p,
+.mm-section-title p,
+.mm-about-page > p {
+  margin: 0;
+  color: var(--mm-secondary);
+  font-size: 13px;
+  line-height: 19px;
+}
+
+.mm-eyebrow {
+  color: var(--mm-tertiary);
+  font-size: 10px;
+  font-weight: 720;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.mm-section-title {
+  margin: 28px 6px 9px;
+}
+
+.mm-section-title h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 660;
+  letter-spacing: -0.012em;
+}
+
+.mm-section-title p {
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.mm-card-list,
+.mm-inset-card {
+  overflow: hidden;
+  border: 1px solid var(--mm-divider);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--foreground) 3.5%, transparent);
+  box-shadow: 0 1px 0 color-mix(in srgb, white 4%, transparent) inset;
+}
+
+.mm-setup-row,
+.mm-permission-info-row,
+.mm-stalker-card {
+  display: grid;
+  min-height: 66px;
+  grid-template-columns: 34px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+}
+
+.mm-setup-row {
+  width: 100%;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  transition: background-color 140ms ease, transform 80ms ease;
+}
+
+.mm-setup-row:hover {
+  background: var(--mm-hover);
+}
+
+.mm-setup-row:active {
+  transform: scale(0.995);
+}
+
+.mm-setup-row + .mm-setup-row,
+.mm-permission-info-row + .mm-permission-info-row {
+  border-top: 1px solid var(--mm-divider);
+}
+
+.mm-row-symbol {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 9px;
+  color: var(--mm-secondary);
+  background: color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+
+.mm-row-symbol svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 1.8;
+}
+
+.mm-row-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.mm-row-copy strong {
+  font-size: 13px;
+  font-weight: 620;
+  letter-spacing: -0.005em;
+}
+
+.mm-row-copy small {
+  overflow: hidden;
+  color: var(--mm-secondary);
+  font-size: 11px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+}
+
+.mm-row-chevron {
+  width: 14px;
+  height: 14px;
+  color: var(--mm-tertiary);
+}
+
+.mm-status-badge {
+  display: inline-flex;
+  min-height: 22px;
+  align-items: center;
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: var(--mm-secondary);
+  background: color-mix(in srgb, var(--foreground) 7%, transparent);
+  font-size: 10px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.mm-status-badge.is-ready {
+  color: #30d158;
+  background: color-mix(in srgb, #30d158 12%, transparent);
+}
+
+.mm-status-badge.is-needs-setup {
+  color: #ff9f0a;
+  background: color-mix(in srgb, #ff9f0a 12%, transparent);
+}
+
+.mm-status-badge.is-unavailable {
+  color: var(--mm-tertiary);
+}
+
+.mm-permission-copy {
+  color: var(--mm-secondary);
+  font-size: 10px;
+  font-weight: 610;
+  white-space: nowrap;
+}
+
+.mm-stalker-card {
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+}
+
+.mm-embedded-control {
+  padding: 14px;
+}
+
+.mm-settings-page {
+  min-height: 100%;
+  padding: 24px 0 64px;
+}
+
+.mm-settings-page > :not(.mm-segmented-wrap) {
+  padding-top: 12px;
+}
+
+.mm-segmented-wrap {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  display: flex;
+  justify-content: center;
+  padding: 4px 24px 12px;
+  background: linear-gradient(var(--mm-surface) 70%, transparent);
+}
+
+.mm-about-page {
+  display: flex;
+  max-width: 620px;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.mm-about-mark {
+  width: 72px;
+  height: 72px;
+  margin-top: 28px;
+  object-fit: contain;
+}
+
+.mm-about-grid {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0;
+  margin-top: 30px;
+  overflow: hidden;
+  border: 1px solid var(--mm-divider);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--foreground) 3.5%, transparent);
+  text-align: left;
+}
+
+.mm-about-grid span,
+.mm-about-grid strong {
+  min-height: 44px;
+  padding: 13px 15px;
+  border-bottom: 1px solid var(--mm-divider);
+  font-size: 12px;
+}
+
+.mm-about-grid span:nth-last-child(-n + 2),
+.mm-about-grid strong:nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+
+.mm-about-grid span {
+  color: var(--mm-secondary);
+}
+
+.mm-about-grid strong {
+  font-weight: 620;
+  text-align: right;
+}
+
+.mm-about-note {
+  max-width: 480px;
+  margin-top: 18px !important;
+  font-size: 11px !important;
+}
+
+/* Existing Hermes-backed settings stay functionally canonical while their
+   content is presented inside MacMan's detail column. */
+.mm-settings-host > .h-full,
+.mm-settings-host > section.h-full {
+  min-height: 100%;
+}
+
+.mm-settings-host [data-slot='settings-content'] {
+  margin-inline: auto;
+}
+
 @media (max-width: 840px) {
   .mm-app {
     grid-template-columns: 212px minmax(0, 1fr);
@@ -298,6 +568,10 @@ body,
   .mm-detail-header {
     padding-right: 20px;
     padding-left: 20px;
+  }
+
+  .mm-page-surface {
+    width: min(100% - 32px, 820px);
   }
 }
 

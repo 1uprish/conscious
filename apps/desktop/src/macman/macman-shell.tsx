@@ -5,10 +5,11 @@ import { cn } from '@/lib/utils'
 import { $gatewayState } from '@/store/session'
 
 import { ContribWiring, WiredPane } from '../app/contrib/wiring'
+import { MacManPages } from './macman-pages'
 import { MACMAN_NAVIGATION, macManNavigationItem, type MacManView } from './navigation'
 
 interface MacManShellProps {
-  detail?: (view: Exclude<MacManView, 'chat'>) => ReactNode
+  detail?: (view: Exclude<MacManView, 'chat'>, navigate: (view: MacManView) => void) => ReactNode
   initialView?: MacManView
 }
 
@@ -105,7 +106,9 @@ function MacManShell({ detail, initialView = 'chat' }: MacManShellProps) {
             <WiredPane part="chatRoutes" />
           </div>
           {activeView !== 'chat' ? (
-            <div className="mm-settings-host">{detail?.(activeView) ?? <PlaceholderDetail view={activeView} />}</div>
+            <div className="mm-settings-host">
+              {detail?.(activeView, setActiveView) ?? <PlaceholderDetail view={activeView} />}
+            </div>
           ) : null}
         </div>
       </section>
@@ -116,7 +119,7 @@ function MacManShell({ detail, initialView = 'chat' }: MacManShellProps) {
 export function MacManController() {
   return (
     <ContribWiring>
-      <MacManShell />
+      <MacManShell detail={(view, navigate) => <MacManPages onNavigate={navigate} view={view} />} />
     </ContribWiring>
   )
 }
