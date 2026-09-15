@@ -68,6 +68,52 @@ def test_user_turn_uses_exact_finn_action_tools_and_current_hermes_runtime():
     asyncio.run(scenario())
 
 
+def test_standalone_greeting_uses_the_zero_latency_conversation_path():
+    async def scenario():
+        def complete(**_kwargs):
+            raise AssertionError("a standalone greeting must not pay for a model call")
+
+        planner = FinnConversationPlanner(complete=complete)
+
+        actions = await planner.plan(_envelope("user", "hey"), main_runtime={"model": "m"})
+
+        assert actions == [
+            {"name": "send_message", "arguments": {"text": "hey, what's up?"}},
+            {"name": "finish_turn", "arguments": {}},
+        ]
+
+    asyncio.run(scenario())
+
+
+def test_conversation_prompt_carries_the_human_hot_path_contract():
+    async def scenario():
+        captured = {}
+
+        async def complete(**kwargs):
+            captured.update(kwargs)
+            return _response(
+                ("send_message", {"text": "two secs"}),
+                ("delegate", {"task": "check tomorrow's weather"}),
+                ("finish_turn", {}),
+            )
+
+        planner = FinnConversationPlanner(complete=complete)
+        await planner.plan(
+            _envelope("user", "what's the weather tomorrow?"),
+            main_runtime={"model": "m"},
+        )
+
+        system_prompt = captured["messages"][0]["content"].lower()
+        assert "quietly find out" in system_prompt
+        assert "two or three words" in system_prompt
+        assert "worker results are evidence" in system_prompt
+        assert "never mention workers" in system_prompt
+        assert "never stack questions" in system_prompt
+        assert "generic help" in system_prompt
+
+    asyncio.run(scenario())
+
+
 def test_worker_turn_removes_delegate_from_the_available_tool_surface():
     async def scenario():
         captured = {}
