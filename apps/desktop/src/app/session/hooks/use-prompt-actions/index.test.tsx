@@ -1971,6 +1971,34 @@ describe('usePromptActions submit / queue drain semantics', () => {
     )
   })
 
+  it('falls back to the canonical prompt path when the managed runtime predates the conversation adapter', async () => {
+    const requestGateway = vi.fn(async (method: string) => {
+      if (method === 'conversation.submit') {
+        throw new Error('unknown method: conversation.submit')
+      }
+
+      return {} as never
+    })
+
+    let handle: HarnessHandle | null = null
+    await actRender(
+      <Harness
+        conversationLayerEnabled
+        onReady={h => (handle = h)}
+        refreshSessions={async () => undefined}
+        requestGateway={requestGateway}
+      />
+    )
+
+    expect(await handle!.submitText('hey')).toBe(true)
+    expect(requestGateway.mock.calls.map(call => call[0])).toEqual(['conversation.submit', 'prompt.submit'])
+    expect(requestGateway).toHaveBeenLastCalledWith(
+      'prompt.submit',
+      { session_id: RUNTIME_SESSION_ID, text: 'hey' },
+      1_800_000
+    )
+  })
+
   it('pins prompt.submit to the active registry connection when the remote session row is untagged', async () => {
     $connection.set({ connectionId: 'hermes01', mode: 'remote' } as never)
     setSessions([sessionInfo({ id: 'stored-remote', profile: 'default' })])

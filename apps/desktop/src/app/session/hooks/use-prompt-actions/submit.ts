@@ -5,6 +5,7 @@ import type { Translations } from '@/i18n'
 import { type ChatMessage, textPart } from '@/lib/chat-messages'
 import { optimisticAttachmentRef } from '@/lib/chat-runtime'
 import { sanitizeComposerInput } from '@/lib/composer-input-sanitize'
+import { isMissingRpcMethod } from '@/lib/gateway-rpc'
 import { setMutableRef } from '@/lib/mutable-ref'
 import {
   isVoicePlaybackActive,
@@ -786,14 +787,30 @@ export function useSubmitPrompt(deps: SubmitPromptDeps) {
           !options?.fromQueue &&
           !$hudMode.get()
 
-        const submitRequest = (targetId: string) =>
-          isOrdinaryVisibleChat
-            ? requestGateway(
-                'conversation.submit',
-                { client_message_id: optimisticId, session_id: targetId, text },
-                PROMPT_SUBMIT_REQUEST_TIMEOUT_MS
-              )
-            : requestGateway('prompt.submit', submitParams(targetId), PROMPT_SUBMIT_REQUEST_TIMEOUT_MS)
+        const submitRequest = async (targetId: string) => {
+          if (!isOrdinaryVisibleChat) {
+            return requestGateway('prompt.submit', submitParams(targetId), PROMPT_SUBMIT_REQUEST_TIMEOUT_MS)
+          }
+
+          try {
+            return await requestGateway(
+              'conversation.submit',
+              { client_message_id: optimisticId, session_id: targetId, text },
+              PROMPT_SUBMIT_REQUEST_TIMEOUT_MS
+            )
+          } catch (error) {
+            // The MacMan conversation adapter is additive. A desktop can be
+            // newer than its managed runtime during an update, so preserve the
+            // canonical Hermes turn path until that runtime catches up. Only a
+            // missing-method response is safe to replay: every other failure
+            // may have admitted the turn already.
+            if (!isMissingRpcMethod(error)) {
+              throw error
+            }
+
+            return requestGateway('prompt.submit', submitParams(targetId), PROMPT_SUBMIT_REQUEST_TIMEOUT_MS)
+          }
+        }
 
         // On sleep/wake the gateway's in-memory session may have been cleared
         // while the desktop app still holds the old session ID. The shared
