@@ -376,6 +376,7 @@ import {
 } from './session-windows'
 import { ensureLoginShellPath } from './shell-path'
 import { createBootstrapCoordinator, sshConfigFingerprint } from './ssh-bootstrap-coordinator'
+import { resolveMacManBackendSource } from './macman-bundled-backend'
 import { collectSshConfigHosts, parseSshGOutput } from './ssh-config'
 import { createSshProbeConnection, pickLocalPort, redactSecrets, SshConnection } from './ssh-connection'
 import { createSshIsolatedKeepaliveRegistry } from './ssh-isolated-keepalive'
@@ -4990,7 +4991,8 @@ function writeDefaultProjectDir(dir) {
 }
 
 function createPythonBackend(root, label, backendArgs, options: any = {}) {
-  const python = findPythonForRoot(root)
+  const pythonRoot = options.pythonRoot || root
+  const python = findPythonForRoot(pythonRoot)
 
   if (!python) {
     return null
@@ -5001,7 +5003,7 @@ function createPythonBackend(root, label, backendArgs, options: any = {}) {
   // `venv`, and mixing the two crashes the backend on its first native
   // import (see venvRootForPython). Fall back to root/venv only for a
   // system python, where the historical layout is the best guess.
-  const venvRoot = venvRootForPython(python, root) ?? path.join(root, 'venv')
+  const venvRoot = venvRootForPython(python, pythonRoot) ?? path.join(pythonRoot, 'venv')
   const venvPython = getVenvPython(venvRoot)
   const command = IS_WINDOWS && fileExists(venvPython) ? venvPython : python
 
@@ -5070,7 +5072,29 @@ function resolveHermesBackend(backendArgs) {
     }
   }
 
-  // 3. ACTIVE_HERMES_ROOT — the canonical install at
+  // 3. Packaged MacMan source — the active managed install supplies the
+  // Python environment and dependencies, while the immutable source shipped
+  // with this exact app build supplies every runtime module. This prevents a
+  // stale ~/.hermes checkout from silently dropping MacMan-only methods and
+  // bypassing the conversation layer.
+  const bundledRoot = resolveMacManBackendSource({
+    resourcesPath: process.resourcesPath,
+    isPackaged: IS_PACKAGED,
+    isSourceRoot: isHermesSourceRoot
+  })
+  const activeRuntime = activeRuntimeState()
+
+  if (bundledRoot && activeRuntime.shouldUseActiveRuntime && !bootstrapRepairRequested) {
+    const backend = createPythonBackend(bundledRoot, 'MacMan bundled runtime', backendArgs, {
+      pythonRoot: ACTIVE_HERMES_ROOT
+    })
+
+    if (backend) {
+      return backend
+    }
+  }
+
+  // 4. ACTIVE_HERMES_ROOT — the canonical install at
   //    %LOCALAPPDATA%\\hermes\\hermes-agent (Windows) or ~/.hermes/hermes-agent.
   //    A valid bootstrap marker proves Desktop finished the first-run install
   //    flow, but marker provenance is NOT the same thing as runtime usability:
@@ -5078,8 +5102,6 @@ function resolveHermesBackend(backendArgs) {
   //    builds could leave a healthy install behind without the marker. If the
   //    active runtime is usable, launch it directly; only fall through to
   //    bootstrap when the runtime itself is unusable.
-  const activeRuntime = activeRuntimeState()
-
   if (activeRuntime.shouldUseActiveRuntime && !bootstrapRepairRequested) {
     if (!activeRuntime.hasValidMarker) {
       rememberLog(
@@ -5094,7 +5116,7 @@ function resolveHermesBackend(backendArgs) {
     rememberLog('[bootstrap] repair requested; bypassing the usable active runtime to re-run the installer')
   }
 
-  // 4. Existing `hermes` on PATH -- installed via install.ps1 / install.sh from
+  // 5. Existing `hermes` on PATH -- installed via install.ps1 / install.sh from
   //    a previous tool-only setup, or pip-installed system-wide. Use it but
   //    do NOT write a bootstrap marker; the user did this themselves and we
   //    don't want to take ownership of an install we didn't perform.
