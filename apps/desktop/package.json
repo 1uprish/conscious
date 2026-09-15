@@ -227,6 +227,10 @@
       {
         "from": "build/macman-backend",
         "to": "macman-backend"
+      },
+      {
+        "from": "build/macman-stalker",
+        "to": "stalker"
       }
     ],
     "asar": true,

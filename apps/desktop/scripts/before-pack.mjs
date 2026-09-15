@@ -61,6 +61,7 @@ import { existsSync, rmSync, renameSync } from 'node:fs'
 import path from 'node:path'
 import { Arch } from 'electron-builder'
 import { stageNodePty, stageGetWindows } from './stage-native-deps.mjs'
+import { isSupportedStalkerPack, stageMacManStalker } from './stage-macman-stalker.mjs'
 
 export function cleanStaleAppOutDir(appOutDir) {
   if (!appOutDir || typeof appOutDir !== 'string') {
@@ -113,6 +114,20 @@ export function preserveRollbackBackup(appOutDir, productExeName = 'Hermes.exe')
 export default async function beforePack(context) {
   const appOutDir = context && context.appOutDir
   const platformName = context && context.electronPlatformName
+  const productFilename = context && context.packager?.appInfo?.productFilename
+  const targetArchitecture = context && typeof context.arch === 'number' ? Arch[context.arch] : undefined
+
+  if (
+    isSupportedStalkerPack({
+      architecture: targetArchitecture,
+      electronPlatformName: platformName,
+      productFilename
+    })
+  ) {
+    const desktopRoot = path.resolve(import.meta.dirname, '..')
+    const payloadRoot = await stageMacManStalker(desktopRoot)
+    console.log(`[before-pack] staged MacMan Stalker companion: ${payloadRoot}`)
+  }
   try {
     // Windows: keep the previous working build as rollback material for the
     // post-build integrity gate (#69179) instead of destroying it. Falls
@@ -132,7 +147,7 @@ export default async function beforePack(context) {
 
   try {
     const platform = context && context.electronPlatformName
-    const archName = context && typeof context.arch === 'number' ? Arch[context.arch] : undefined
+    const archName = targetArchitecture
     if (platform && archName) {
       if (archName === 'universal') {
         console.warn(
