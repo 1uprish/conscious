@@ -147,6 +147,24 @@ test('buildDesktopBackendEnv forces PYTHONUTF8 unless the user set it explicitly
   assert.equal(optedOut.PYTHONUTF8, '0')
 })
 
+test('buildDesktopBackendEnv keeps packaged Python code immutable and isolated', () => {
+  const env = buildDesktopBackendEnv({
+    hermesHome: '/Users/test/.hermes',
+    currentEnv: {
+      PATH: '/usr/bin',
+      PYTHONDONTWRITEBYTECODE: '0',
+      PYTHONNOUSERSITE: '0',
+      PYTHONSAFEPATH: '0'
+    },
+    platform: 'darwin',
+    pathModule: path.posix
+  })
+
+  assert.equal(env.PYTHONDONTWRITEBYTECODE, '1')
+  assert.equal(env.PYTHONNOUSERSITE, '1')
+  assert.equal(env.PYTHONSAFEPATH, '1')
+})
+
 test('normalizeHermesHomeRoot maps profile homes back to the global Hermes root', () => {
   assert.equal(
     normalizeHermesHomeRoot('/Users/test/.hermes/profiles/oracle', { pathModule: path.posix }),
