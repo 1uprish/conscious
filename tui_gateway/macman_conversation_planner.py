@@ -43,11 +43,25 @@ _GREETING_REPLIES = {
     "yo": "yo, what's up?",
 }
 
+_IDENTITY_QUESTIONS = frozenset({
+    "what do i call you",
+    "what is your name",
+    "whats your name",
+    "who are you",
+})
+
 
 def _fast_social_actions(envelope: dict) -> list[dict] | None:
     if envelope.get("source") != "user" or envelope.get("attachments"):
         return None
-    content = re.sub(r"[^a-z]", "", str(envelope.get("content") or "").lower())
+    raw_content = str(envelope.get("content") or "").lower()
+    identity_question = re.sub(r"[^a-z0-9]+", " ", raw_content.replace("'", "").replace("’", "")).strip()
+    if identity_question in _IDENTITY_QUESTIONS:
+        return [
+            {"name": "send_message", "arguments": {"text": "macman"}},
+            {"name": "finish_turn", "arguments": {}},
+        ]
+    content = re.sub(r"[^a-z]", "", raw_content)
     base = re.sub(r"(.)\1+", r"\1", content)
     reply = _GREETING_REPLIES.get(base)
     if reply is None:
