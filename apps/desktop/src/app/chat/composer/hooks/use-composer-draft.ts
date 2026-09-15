@@ -6,7 +6,7 @@ import '@/store/suggestion-providers/github'
 import '@/store/suggestion-providers/mcp'
 import '@/store/suggestion-providers/skill'
 
-import { useAui, useAuiState, useComposerRuntime } from '@assistant-ui/react'
+import { useAui, useComposerRuntime } from '@assistant-ui/react'
 import { SLASH_COMMAND_RE } from '@hermes/shared'
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
@@ -57,6 +57,27 @@ interface UseComposerDraftArgs {
   sessionId: string | null | undefined
 }
 
+interface DraftEdges {
+  hasText: boolean
+  isHelpHint: boolean
+  isSteerableText: boolean
+}
+
+const draftEdgesFor = (value: string): DraftEdges => {
+  const trimmed = value.trim()
+
+  return {
+    hasText: trimmed.length > 0,
+    isHelpHint: value === '?',
+    isSteerableText: trimmed.length > 0 && !SLASH_COMMAND_RE.test(trimmed)
+  }
+}
+
+const draftEdgesMatch = (left: DraftEdges, right: DraftEdges): boolean =>
+  left.hasText === right.hasText &&
+  left.isHelpHint === right.isHelpHint &&
+  left.isSteerableText === right.isSteerableText
+
 /**
  * The composer's draft engine — the detached source-of-truth spine. The live
  * text lives in the contentEditable DOM + `draftRef`; React only sees coarse
@@ -81,28 +102,35 @@ export function useComposerDraft({
   const { attachments: attachmentScope, target } = useComposerScope()
 
   // Coarse edges only — these flip rarely (empty↔non-empty, the `?` help sigil,
-  // steerable-vs-slash), so typing within a line costs no render.
-  const hasText = useAuiState(s => s.composer.text.trim().length > 0)
-  const isHelpHint = useAuiState(s => s.composer.text === '?')
+  // steerable-vs-slash), so typing within a line costs no render. The live DOM
+  // is the composer's source of truth: assistant-ui briefly has no bound core
+  // during a runtime rebind, and its setText mutator throws in that window. If
+  // these edges were read back solely from assistant-ui, text would be visible
+  // in the editor while the controls still showed the voice button instead of
+  // Send. Mirror the edges before attempting the best-effort assistant-ui write.
+  const [draftEdges, setDraftEdges] = useState(() => draftEdgesFor(composerRuntime.getState().text))
 
-  const isSteerableText = useAuiState(s => {
-    const trimmed = s.composer.text.trim()
+  const updateDraftEdges = useCallback((value: string) => {
+    const next = draftEdgesFor(value)
+    setDraftEdges(current => (draftEdgesMatch(current, next) ? current : next))
+  }, [])
 
-    return trimmed.length > 0 && !SLASH_COMMAND_RE.test(trimmed)
-  })
+  const { hasText, isHelpHint, isSteerableText } = draftEdges
 
   // assistant-ui's composer mutators throw when the core isn't bound yet (a
   // startup/thread-swap window); the DOM + draftRef hold the text and the
   // subscription reconciles once it binds, so swallow the premature write.
   const setComposerText = useCallback(
     (value: string) => {
+      updateDraftEdges(value)
+
       try {
         aui.composer().setText(value)
       } catch {
         // Composer core not bound yet — DOM/draftRef carry the text.
       }
     },
-    [aui]
+    [aui, updateDraftEdges]
   )
 
   const editorRef = useRef<HTMLDivElement | null>(null)
@@ -318,6 +346,7 @@ export function useComposerDraft({
     const sync = () => {
       const text = composerRuntime.getState().text
       draftRef.current = text
+      updateDraftEdges(text)
       // Composer suggestion pills for THIS session's draft (debounced +
       // change-gated in the bus — this is just a timer reset).
       sampleComposerDraft(sessionIdRef.current ?? null, text)
@@ -357,7 +386,7 @@ export function useComposerDraft({
       unsubscribe()
       window.clearTimeout(draftPersistTimerRef.current)
     }
-  }, [composerRuntime, queueEditRef])
+  }, [composerRuntime, queueEditRef, updateDraftEdges])
 
   const insertText = (text: string) => {
     const base = draftRef.current
