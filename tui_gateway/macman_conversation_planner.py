@@ -132,6 +132,20 @@ def _ensure_finish_turn(actions: list[dict]) -> list[dict]:
     return actions
 
 
+def _normalize_optional_action_fields(actions: list[dict]) -> list[dict]:
+    """Match Finn's optional-field semantics without changing executable intent."""
+    normalized = []
+    for action in actions:
+        if action.get("name") != "delegate":
+            normalized.append(action)
+            continue
+        arguments = dict(action.get("arguments") or {})
+        if not str(arguments.get("worker_id") or "").strip():
+            arguments.pop("worker_id", None)
+        normalized.append({**action, "arguments": arguments})
+    return normalized
+
+
 async def _default_complete(**kwargs):
     from agent.auxiliary_client import async_call_llm
 
@@ -196,7 +210,7 @@ class FinnConversationPlanner:
         )
         if inspect.isawaitable(response):
             response = await response
-        actions = _ensure_finish_turn(_parse_actions(response))
+        actions = _ensure_finish_turn(_normalize_optional_action_fields(_parse_actions(response)))
         try:
             ConversationActionExecutor._validated_actions(source, actions)
         except ConversationActionError as exc:
