@@ -6,6 +6,7 @@ import asyncio
 import logging
 
 from tui_gateway.macman_conversation_planner import ConversationPlanError
+from tui_gateway.macman_conversation_planner import FinnConversationPlanner
 from tui_gateway.macman_conversation_runtime import MacManConversationRuntime
 
 
@@ -46,6 +47,35 @@ def test_social_turn_stays_in_finn_and_never_runs_hermes():
 
         assert delivered == ["hey, what's up?"]
         assert delegated == []
+
+    asyncio.run(scenario())
+
+
+def test_zero_latency_identity_does_not_wait_for_the_hermes_agent_build():
+    async def scenario():
+        delivered = []
+
+        def hermes_not_ready():
+            raise RuntimeError("Hermes agent is not ready")
+
+        runtime = MacManConversationRuntime(
+            planner=FinnConversationPlanner(
+                complete=lambda **_kwargs: (_ for _ in ()).throw(
+                    AssertionError("identity must not call the model")
+                ),
+            ),
+            current_runtime=hermes_not_ready,
+            deliver=delivered.append,
+            delegate=lambda _request: None,
+            fail_open=lambda _turn: (_ for _ in ()).throw(
+                AssertionError("identity must not fail open to Hermes")
+            ),
+        )
+
+        result = await runtime.handle(_turn(content="What do I call you?"))
+
+        assert delivered == ["macman"]
+        assert result["fallback"] is False
 
     asyncio.run(scenario())
 
