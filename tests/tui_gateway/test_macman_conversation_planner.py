@@ -193,7 +193,7 @@ def test_invalid_model_output_fails_loud_so_the_gateway_can_fail_open(response, 
     async def scenario():
         planner = FinnConversationPlanner(complete=lambda **_kwargs: response)
         with pytest.raises(ConversationPlanError, match=message):
-            await planner.plan(_envelope("user", "hey"), main_runtime={"model": "m"})
+            await planner.plan(_envelope("user", "do the thing"), main_runtime={"model": "m"})
 
     asyncio.run(scenario())
 
@@ -205,6 +205,6 @@ def test_invalid_tool_json_is_not_guessed_or_partially_executed():
         ]))])
         planner = FinnConversationPlanner(complete=lambda **_kwargs: response)
         with pytest.raises(ConversationPlanError, match="JSON object"):
-            await planner.plan(_envelope("user", "hey"), main_runtime={"model": "m"})
+            await planner.plan(_envelope("user", "do the thing"), main_runtime={"model": "m"})
 
     asyncio.run(scenario())
