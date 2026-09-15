@@ -231,6 +231,10 @@
       {
         "from": "build/macman-stalker",
         "to": "stalker"
+      },
+      {
+        "from": "THIRD_PARTY_NOTICES.md",
+        "to": "THIRD_PARTY_NOTICES.md"
       }
     ],
     "asar": true,
