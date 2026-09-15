@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { useI18n } from '@/i18n'
+import { presentProductCopy, useProductPresentation } from '@/lib/product-presentation'
 import { resetBrowseState } from '@/store/composer-input-history'
 
 import { pickPlaceholder } from '../composer-utils'
@@ -20,7 +21,13 @@ interface UseComposerPlaceholderOptions {
  */
 export function useComposerPlaceholder({ disabled, reconnecting, sessionId }: UseComposerPlaceholderOptions): string {
   const { t } = useI18n()
-  const newSessionPlaceholders = t.composer.newSessionPlaceholders
+  const presentation = useProductPresentation()
+
+  const newSessionPlaceholders = useMemo(
+    () => t.composer.newSessionPlaceholders.map(value => presentProductCopy(value, presentation)),
+    [presentation, t.composer.newSessionPlaceholders]
+  )
+
   const followUpPlaceholders = t.composer.followUpPlaceholders
 
   const [restingPlaceholder, setRestingPlaceholder] = useState(() =>
@@ -55,7 +62,7 @@ export function useComposerPlaceholder({ disabled, reconnecting, sessionId }: Us
   // disabled until the gateway is open again.
   return disabled
     ? reconnecting
-      ? t.composer.placeholderReconnecting
-      : t.composer.placeholderStarting
+      ? presentProductCopy(t.composer.placeholderReconnecting, presentation)
+      : presentProductCopy(t.composer.placeholderStarting, presentation)
     : restingPlaceholder
 }

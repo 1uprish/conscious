@@ -1,6 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 
+import { MACMAN_PRESENTATION, ProductPresentationProvider } from '@/lib/product-presentation'
 import { cn } from '@/lib/utils'
 import { $gatewayState } from '@/store/session'
 
@@ -123,9 +124,11 @@ export function MacManController() {
   }, [])
 
   return (
-    <ContribWiring presentation="macman">
-      <MacManShell detail={(view, navigate) => <MacManPages onNavigate={navigate} view={view} />} />
-    </ContribWiring>
+    <ProductPresentationProvider value={MACMAN_PRESENTATION}>
+      <ContribWiring presentation="macman">
+        <MacManShell detail={(view, navigate) => <MacManPages onNavigate={navigate} view={view} />} />
+      </ContribWiring>
+    </ProductPresentationProvider>
   )
 }
 

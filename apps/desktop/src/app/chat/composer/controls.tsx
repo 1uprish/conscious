@@ -6,6 +6,7 @@ import { Tip, TipKeybindLabel } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import { Ear, EarOff, iconSize, Layers3, Loader2, Square, Volume2, VolumeX } from '@/lib/icons'
+import { useProductPresentation } from '@/lib/product-presentation'
 import { cn } from '@/lib/utils'
 import { $hudMode, closeHud, resetHudLayout } from '@/store/hud'
 import { $wakeWord, toggleWakeWord } from '@/store/wake-word'
@@ -71,6 +72,7 @@ export function ComposerControls({
   const { t } = useI18n()
   const c = t.composer
   const hudMode = useStore($hudMode)
+  const presentation = useProductPresentation()
 
   if (conversation.active) {
     return <ConversationPill {...conversation} disabled={disabled} />
@@ -103,7 +105,7 @@ export function ComposerControls({
     <>
       <DictationButton disabled={disabled} onToggle={onDictate} state={state.voice} status={voiceStatus} />
       <AutoSpeakButton active={autoSpeak} disabled={disabled} onToggle={onToggleAutoSpeak} />
-      <WakeWordButton disabled={disabled} />
+      {presentation.showWakeWord ? <WakeWordButton disabled={disabled} /> : null}
     </>
   )
 
@@ -217,6 +219,7 @@ function ConversationPill({
 }: ConversationProps & { disabled: boolean }) {
   const { t } = useI18n()
   const c = t.composer
+  const presentation = useProductPresentation()
   const speaking = status === 'speaking'
   const listening = status === 'listening' && !muted
 
@@ -235,7 +238,7 @@ function ConversationPill({
     <div className="ml-auto flex shrink-0 items-center gap-(--composer-control-gap)">
       {/* Keep the ear visible during voice chat — shown paused, since the
           conversation holds the mic (the one time wake must not listen). */}
-      <WakeWordButton disabled={disabled} pausedForVoice />
+      {presentation.showWakeWord ? <WakeWordButton disabled={disabled} pausedForVoice /> : null}
       <Tip label={muted ? c.unmuteMic : c.muteMic}>
         <Button
           aria-label={muted ? c.unmuteMic : c.muteMic}
