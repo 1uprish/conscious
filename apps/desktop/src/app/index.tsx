@@ -1,6 +1,7 @@
-// The app root is the contribution-driven shell: panes, titlebar/statusbar
-// items, keybinds, palette commands, routes, and themes all register through
-// the contribution registry (src/contrib) — core surfaces use the same calls
-// plugins do. Everything lives under ./contrib: the wiring (gateway boot,
-// sessions, streams) + pane surfaces, and the pane/layout registration.
-export { ContribController as default } from './contrib'
+import '@/macman/macman.css'
+
+// MacMan owns the desktop presentation while the contribution wiring beneath
+// it remains the canonical Hermes session, tool, approval, and model runtime.
+// This boundary is intentionally visual: the shell never reimplements prompt
+// submission or completion state.
+export { MacManController as default } from '@/macman/macman-shell'

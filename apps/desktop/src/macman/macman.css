@@ -1,0 +1,316 @@
+:root {
+  --mm-sidebar: color-mix(in srgb, var(--background) 86%, transparent);
+  --mm-surface: color-mix(in srgb, var(--background) 95%, black 5%);
+  --mm-divider: color-mix(in srgb, var(--foreground) 12%, transparent);
+  --mm-hover: color-mix(in srgb, var(--foreground) 7%, transparent);
+  --mm-selected: color-mix(in srgb, var(--foreground) 11%, transparent);
+  --mm-secondary: color-mix(in srgb, var(--foreground) 62%, transparent);
+  --mm-tertiary: color-mix(in srgb, var(--foreground) 42%, transparent);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
+.mm-app {
+  display: grid;
+  width: 100vw;
+  height: 100vh;
+  grid-template-columns: 256px minmax(0, 1fr);
+  overflow: hidden;
+  color: var(--foreground);
+  background: var(--mm-surface);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mm-sidebar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--mm-divider);
+  background: var(--mm-sidebar);
+  backdrop-filter: blur(34px) saturate(125%);
+}
+
+.mm-window-drag {
+  height: 52px;
+  flex: 0 0 52px;
+  -webkit-app-region: drag;
+}
+
+.mm-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 18px 18px;
+}
+
+.mm-brand-mark {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
+.mm-brand span {
+  display: grid;
+  min-width: 0;
+}
+
+.mm-brand strong {
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.mm-brand small {
+  color: var(--mm-secondary);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.mm-navigation {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 0 10px 16px;
+  scrollbar-width: none;
+}
+
+.mm-navigation::-webkit-scrollbar {
+  display: none;
+}
+
+.mm-navigation-group + .mm-navigation-group {
+  margin-top: 20px;
+}
+
+.mm-navigation-group > p {
+  margin: 0 10px 6px;
+  color: var(--mm-tertiary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.mm-navigation-item {
+  display: grid;
+  width: 100%;
+  min-height: 36px;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 9px;
+  padding: 7px 10px;
+  color: var(--mm-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 540;
+  text-align: left;
+  transition: background-color 140ms ease, color 140ms ease, transform 80ms ease;
+}
+
+.mm-navigation-item:hover {
+  color: var(--foreground);
+  background: var(--mm-hover);
+}
+
+.mm-navigation-item:active {
+  transform: scale(0.985);
+}
+
+.mm-navigation-item.is-active {
+  color: var(--foreground);
+  background: var(--mm-selected);
+  font-weight: 620;
+}
+
+.mm-navigation-icon {
+  width: 17px;
+  height: 17px;
+  stroke-width: 1.75;
+}
+
+.mm-sidebar-footer {
+  border-top: 1px solid var(--mm-divider);
+  padding: 14px 18px 16px;
+}
+
+.mm-connection {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--mm-secondary);
+  font-size: 11px;
+  font-weight: 560;
+}
+
+.mm-connection-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ff9f0a;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #ff9f0a 14%, transparent);
+}
+
+.mm-connection[data-state='ready'] .mm-connection-dot {
+  background: #30d158;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #30d158 14%, transparent);
+}
+
+.mm-connection[data-state='closed'] .mm-connection-dot,
+.mm-connection[data-state='offline'] .mm-connection-dot {
+  background: #ff453a;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #ff453a 14%, transparent);
+}
+
+.mm-detail {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: 84px minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.mm-detail-header {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  border-bottom: 1px solid var(--mm-divider);
+  padding: 24px 32px 16px;
+  background: color-mix(in srgb, var(--mm-surface) 93%, transparent);
+  backdrop-filter: blur(24px) saturate(115%);
+  -webkit-app-region: drag;
+}
+
+.mm-detail-header > * {
+  -webkit-app-region: no-drag;
+}
+
+.mm-detail-header h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 680;
+  letter-spacing: -0.025em;
+  line-height: 24px;
+}
+
+.mm-detail-header p {
+  margin: 2px 0 0;
+  color: var(--mm-secondary);
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.mm-detail-body,
+.mm-chat-host,
+.mm-settings-host {
+  min-width: 0;
+  min-height: 0;
+}
+
+.mm-detail-body {
+  position: relative;
+  overflow: hidden;
+}
+
+.mm-chat-host {
+  width: 100%;
+  height: 100%;
+}
+
+.mm-chat-host.is-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.mm-settings-host {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  background: var(--mm-surface);
+}
+
+.mm-placeholder {
+  display: grid;
+  min-height: 100%;
+  place-content: center;
+  justify-items: center;
+  padding: 48px;
+  text-align: center;
+}
+
+.mm-placeholder-icon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border: 1px solid var(--mm-divider);
+  border-radius: 15px;
+  color: var(--mm-secondary);
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+  box-shadow: 0 12px 30px color-mix(in srgb, black 13%, transparent);
+}
+
+.mm-placeholder-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.mm-placeholder h2 {
+  margin: 20px 0 6px;
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.mm-placeholder p {
+  max-width: 440px;
+  margin: 0;
+  color: var(--mm-secondary);
+  font-size: 13px;
+  line-height: 19px;
+}
+
+.mm-placeholder-status {
+  margin-top: 16px;
+  color: var(--mm-tertiary);
+  font-size: 11px;
+}
+
+@media (max-width: 840px) {
+  .mm-app {
+    grid-template-columns: 212px minmax(0, 1fr);
+  }
+
+  .mm-detail-header {
+    padding-right: 20px;
+    padding-left: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-navigation-item {
+    transition: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .mm-sidebar,
+  .mm-detail-header {
+    background: var(--background);
+    backdrop-filter: none;
+  }
+}
