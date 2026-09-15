@@ -252,6 +252,45 @@ describe('useComposerDraft — draft survives full unmount (Settings navigation,
   })
 })
 
+describe('useComposerDraft — DOM text remains actionable while the assistant composer rebinds', () => {
+  afterEach(() => {
+    cleanup()
+    mockComposerApi.setText.mockReset()
+    mainComposerScope.clear()
+    clearSessionDraft('session-rebind')
+  })
+
+  it('exposes the send edge even when the assistant composer rejects the mirrored text', () => {
+    let draft!: ReturnType<typeof useComposerDraft>
+
+    function RebindHarness() {
+      draft = useComposerDraft({
+        activeQueueSessionKey: 'session-rebind',
+        focusKey: null,
+        inputDisabled: false,
+        queueEditRef: { current: null as QueueEditState | null },
+        sessionId: 'session-rebind'
+      })
+
+      return <div contentEditable data-slot="composer-rich-input" ref={draft.editorRef} />
+    }
+
+    render(<RebindHarness />)
+
+    mockComposerApi.setText.mockImplementationOnce(() => {
+      throw new Error('Composer is not available')
+    })
+
+    act(() => {
+      draft.editorRef.current!.textContent = 'yoooo'
+      expect(draft.syncDraftFromEditor()).toBe('yoooo')
+    })
+
+    expect(draft.hasText).toBe(true)
+    expect(draft.isSteerableText).toBe(true)
+  })
+})
+
 describe('useComposerDraft — a closing composer hands the focus-bus key back', () => {
   afterEach(() => {
     cleanup()
