@@ -106,8 +106,8 @@ def test_conversation_prompt_carries_the_human_hot_path_contract():
         system_prompt = captured["messages"][0]["content"].lower()
         assert "quietly find out" in system_prompt
         assert "two or three words" in system_prompt
-        assert "worker results are evidence" in system_prompt
-        assert "never mention workers" in system_prompt
+        assert "worker results are internal facts, not copy" in system_prompt
+        assert "don't mention workers" in system_prompt
         assert "never stack questions" in system_prompt
         assert "generic help" in system_prompt
 
