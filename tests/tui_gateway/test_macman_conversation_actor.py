@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+import contextlib
+import threading
+from types import SimpleNamespace
+
 import pytest
 
+from hermes_state import SessionDB
 from tui_gateway.macman_conversation_actions import ConversationActionError
 from tui_gateway.macman_conversation_actor import MacManConversationActor
 
@@ -48,6 +53,102 @@ def _actor(store=None):
     actor.owner_id = "owner-one"
     actor.store = store or RecordingStore()
     return actor
+
+
+class CanonicalServer:
+    def __init__(self, database):
+        self.database = database
+        self.events = []
+
+    def _ensure_session_db_row(self, session):
+        self.database.create_session(session["session_key"], source="desktop")
+        return True
+
+    def _persist_branch_seed(self, _session):
+        return None
+
+    @contextlib.contextmanager
+    def _session_db(self, _session):
+        yield self.database
+
+    def _emit(self, event, sid, payload=None):
+        # Delivery must happen only after the turn is durable. A renderer can
+        # reconcile at any event boundary, including immediately on message.start.
+        durable = self.database.get_messages_as_conversation("stored-chat", include_row_ids=True)
+        self.events.append((event, sid, payload, [(item["role"], item["content"]) for item in durable]))
+
+
+def _canonical_actor(tmp_path):
+    database = SessionDB(tmp_path / "state.db")
+    actor = _actor()
+    actor.server = CanonicalServer(database)
+    actor._attached_lock = threading.Lock()
+    history = []
+    session = {
+        "agent": SimpleNamespace(session_id="stored-chat", _session_messages=history),
+        "history": history,
+        "history_lock": threading.RLock(),
+        "history_version": 0,
+        "session_key": "stored-chat",
+        "source": "desktop",
+    }
+    actor.attach("live-chat", session)
+    return actor, database, session
+
+
+def test_actor_commits_finn_turn_to_hermes_before_visible_delivery(tmp_path):
+    actor, database, session = _canonical_actor(tmp_path)
+    envelope = {
+        "source": "user",
+        "message_id": "user-client-one",
+        "content": "yo",
+        "attachments": [],
+    }
+
+    actor._deliver("hey, what's up?")
+    assert actor.server.events == []
+
+    actor._record_turn(envelope, {"delivered": ["hey, what's up?"]})
+
+    durable = database.get_messages_as_conversation("stored-chat", include_row_ids=True)
+    assert [(item["role"], item["content"]) for item in durable] == [
+        ("user", "yo"),
+        ("assistant", "hey, what's up?"),
+    ]
+    assert session["history"] == durable
+    assert session["agent"]._session_messages is session["history"]
+    assert session["history_version"] == 1
+    assert actor.server.events == [
+        ("message.start", "live-chat", None, [("user", "yo"), ("assistant", "hey, what's up?")]),
+        (
+            "message.complete",
+            "live-chat",
+            {"text": "hey, what's up?"},
+            [("user", "yo"), ("assistant", "hey, what's up?")],
+        ),
+    ]
+
+
+def test_actor_replay_does_not_duplicate_or_redeliver_a_committed_finn_turn(tmp_path):
+    actor, database, session = _canonical_actor(tmp_path)
+    envelope = {
+        "source": "user",
+        "message_id": "user-client-one",
+        "content": "yo",
+        "attachments": [],
+    }
+    result = {"delivered": ["hey, what's up?"]}
+
+    actor._record_turn(envelope, result)
+    actor._record_turn(envelope, result)
+
+    durable = database.get_messages_as_conversation("stored-chat", include_row_ids=True)
+    assert [(item["role"], item["content"]) for item in durable] == [
+        ("user", "yo"),
+        ("assistant", "hey, what's up?"),
+    ]
+    assert session["history_version"] == 1
+    assert [event[0] for event in actor.server.events] == ["message.start", "message.complete"]
 
 
 def test_actor_records_the_inbound_turn_and_each_visible_reply_idempotently():
@@ -141,4 +242,3 @@ def test_actor_persists_worker_history_before_returning_a_sanitized_result():
         "content": "Notes is open",
     }
     assert "_model_messages" in envelope
-
