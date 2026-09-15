@@ -87,6 +87,30 @@ def test_standalone_greeting_uses_the_zero_latency_conversation_path():
     asyncio.run(scenario())
 
 
+@pytest.mark.parametrize(
+    "message",
+    [
+        "what do i call you",
+        "what's your name?",
+        "who are you?",
+    ],
+)
+def test_identity_questions_never_leak_the_internal_hermes_runtime(message):
+    async def scenario():
+        def complete(**_kwargs):
+            raise AssertionError("product identity must not depend on the selected model")
+
+        planner = FinnConversationPlanner(complete=complete)
+        actions = await planner.plan(_envelope("user", message), main_runtime={"model": "m"})
+
+        assert actions == [
+            {"name": "send_message", "arguments": {"text": "macman"}},
+            {"name": "finish_turn", "arguments": {}},
+        ]
+
+    asyncio.run(scenario())
+
+
 def test_conversation_prompt_carries_the_human_hot_path_contract():
     async def scenario():
         captured = {}
