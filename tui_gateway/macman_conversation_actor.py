@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import threading
 from pathlib import Path
 
@@ -13,6 +14,9 @@ from tui_gateway.macman_conversation_planner import FinnConversationPlanner
 from tui_gateway.macman_conversation_runtime import MacManConversationRuntime
 from tui_gateway.macman_conversation_store import ConversationInboxStore
 from tui_gateway.macman_hermes_worker import HermesWorkerBridge
+
+
+logger = logging.getLogger(__name__)
 
 
 class MacManConversationActor:
@@ -98,10 +102,12 @@ class MacManConversationActor:
             for key in ("model", "provider", "base_url", "api_key", "api_mode")
         }
 
-    def _deliver(self, text: str) -> None:
-        sid, _session = self._attached()
-        self.server._emit("message.start", sid)
-        self.server._emit("message.complete", sid, {"text": text})
+    def _deliver(self, _text: str) -> None:
+        # Delivery is staged by ConversationActionExecutor in its result. The
+        # visible event is emitted by _record_turn only after the same turn is
+        # committed to Hermes' canonical transcript. Otherwise a renderer
+        # refresh between these two operations erases the optimistic message.
+        return None
 
     def _conversation_context(self, _envelope: dict) -> dict:
         return self.store.conversation_context(self.owner_id)
@@ -122,7 +128,85 @@ class MacManConversationActor:
             names.append(name.strip())
         return f"[attachments: {', '.join(names)}]"
 
-    def _record_turn(self, envelope: dict, result: dict) -> None:
+    @staticmethod
+    def _canonical_message_id(message_id: str, role: str) -> str:
+        return f"macman-conversation:{role}:{message_id}"
+
+    def _canonical_turn_messages(self, envelope: dict, result: dict) -> list[dict]:
+        message_id = str(envelope.get("message_id") or "").strip()
+        source = str(envelope.get("source") or "").strip()
+        inbound = {
+            "role": "user",
+            "content": self._turn_content(envelope),
+            "platform_message_id": self._canonical_message_id(message_id, source or "user"),
+        }
+        if source != "user":
+            # Worker and trigger envelopes are model context, not words typed by
+            # the human. Keep the role alternation Hermes requires while hiding
+            # the internal carrier from the visible transcript.
+            inbound["display_kind"] = "hidden"
+
+        delivered = [str(text).strip() for text in result.get("delivered", []) if str(text).strip()]
+        assistant = {
+            "role": "assistant",
+            "content": "\n\n".join(delivered),
+            "platform_message_id": self._canonical_message_id(message_id, "assistant"),
+        }
+        if not delivered:
+            assistant["display_kind"] = "hidden"
+        return [inbound, assistant]
+
+    def _persist_canonical_turn(self, envelope: dict, result: dict) -> bool:
+        _sid, session = self._attached()
+        agent = session.get("agent")
+        session_id = str(getattr(agent, "session_id", None) or session.get("session_key") or "").strip()
+        if not session_id:
+            raise RuntimeError("MacMan conversation has no canonical Hermes session")
+        if not self.server._ensure_session_db_row(session):
+            raise RuntimeError("Hermes session database is unavailable")
+        self.server._persist_branch_seed(session)
+
+        messages = self._canonical_turn_messages(envelope, result)
+        first_message_id = messages[0]["platform_message_id"]
+        with self.server._session_db(session) as database:
+            if database is None:
+                raise RuntimeError("Hermes session database is unavailable")
+            if database.has_platform_message_id(session_id, first_message_id):
+                return False
+            inserted = database.append_messages_batch(session_id, messages)
+            if inserted != len(messages):
+                raise RuntimeError(
+                    f"Hermes persisted {inserted} of {len(messages)} MacMan conversation messages"
+                )
+            committed = [
+                message
+                for message in database.get_messages_as_conversation(
+                    session_id,
+                    include_row_ids=True,
+                )
+                if message.get("message_id") in {
+                    item["platform_message_id"] for item in messages
+                }
+            ]
+        if len(committed) != len(messages):
+            raise RuntimeError("Hermes could not reload the committed MacMan conversation turn")
+
+        with session["history_lock"]:
+            history = session.setdefault("history", [])
+            known_ids = {
+                message.get("message_id")
+                for message in history
+                if isinstance(message, dict)
+            }
+            history.extend(
+                message for message in committed if message.get("message_id") not in known_ids
+            )
+            session["history_version"] = int(session.get("history_version", 0)) + 1
+            if agent is not None:
+                agent._session_messages = history
+        return True
+
+    def _record_private_turn(self, envelope: dict, result: dict) -> None:
         message_id = str(envelope.get("message_id") or "").strip()
         source = str(envelope.get("source") or "").strip()
         self.store.record_turn(
@@ -140,6 +224,21 @@ class MacManConversationActor:
                 message_id=f"reply:{message_id}:{index}",
                 content=text,
             )
+
+    def _record_turn(self, envelope: dict, result: dict) -> None:
+        created = self._persist_canonical_turn(envelope, result)
+        try:
+            self._record_private_turn(envelope, result)
+        except Exception:
+            # Hermes is the transcript authority. A private Finn context write
+            # must not make an already durable user turn disappear.
+            logger.warning("failed to update Finn private conversation context", exc_info=True)
+        if not created:
+            return
+        sid, _session = self._attached()
+        for text in result.get("delivered", []):
+            self.server._emit("message.start", sid)
+            self.server._emit("message.complete", sid, {"text": text})
 
     def _load_worker_history(self, worker_id: str) -> list[dict]:
         return self.store.get_worker_history(self.owner_id, worker_id)

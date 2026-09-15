@@ -151,6 +151,24 @@ def test_actor_replay_does_not_duplicate_or_redeliver_a_committed_finn_turn(tmp_
     assert [event[0] for event in actor.server.events] == ["message.start", "message.complete"]
 
 
+def test_actor_keeps_worker_input_internal_while_persisting_its_finn_reply(tmp_path):
+    actor, database, _session = _canonical_actor(tmp_path)
+    envelope = {
+        "source": "worker",
+        "message_id": "worker-one:complete:user-client-one",
+        "content": "Notes is open with the project note selected.",
+        "attachments": [],
+    }
+
+    actor._record_turn(envelope, {"delivered": ["done, project note's open"]})
+
+    durable = database.get_messages_as_conversation("stored-chat", include_row_ids=True)
+    assert [item["role"] for item in durable] == ["user", "assistant"]
+    assert durable[0]["display_kind"] == "hidden"
+    assert durable[1]["content"] == "done, project note's open"
+    assert actor.server.events[-1][2] == {"text": "done, project note's open"}
+
+
 def test_actor_records_the_inbound_turn_and_each_visible_reply_idempotently():
     actor = _actor()
     envelope = {
@@ -163,7 +181,7 @@ def test_actor_records_the_inbound_turn_and_each_visible_reply_idempotently():
         ],
     }
 
-    actor._record_turn(envelope, {"delivered": ["got it", "the note is open"]})
+    actor._record_private_turn(envelope, {"delivered": ["got it", "the note is open"]})
 
     assert actor.store.calls == [
         ("record", "owner-one", {
