@@ -80,6 +80,11 @@ def test_work_turn_acknowledges_then_delegates_exact_user_request():
         assert request["user_content"] == turn["content"]
         assert request["attachments"] == turn["attachments"]
         assert request["origin_message_id"] == turn["message_id"]
+        assert request["authorization"] == {
+            "source": "explicit_desktop_user",
+            "user_request": "open Notes",
+            "delegated_task": "Open Notes",
+        }
         assert result["worker_id"] == "worker-one"
 
     asyncio.run(scenario())

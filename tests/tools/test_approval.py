@@ -56,6 +56,23 @@ class TestApprovalModeParsing:
         with mock_patch("hermes_cli.config.load_config_readonly", return_value={"approvals": {"mode": False}}):
             assert _get_approval_mode() == "off"
 
+    def test_explicit_desktop_request_uses_smart_approval_only_inside_worker_scope(self):
+        with mock_patch(
+            "hermes_cli.config.load_config_readonly",
+            return_value={"approvals": {"mode": "manual"}},
+        ):
+            assert _get_approval_mode() == "manual"
+            token = approval_context.set_current_request_authorization(
+                source="explicit_desktop_user",
+                user_request="open Notes",
+                delegated_task="Open Notes",
+            )
+            try:
+                assert _get_approval_mode() == "smart"
+            finally:
+                approval_context.reset_current_request_authorization(token)
+            assert _get_approval_mode() == "manual"
+
 
 class TestSmartApproval:
     def test_smart_approval_uses_call_llm(self):
@@ -68,6 +85,41 @@ class TestSmartApproval:
         assert result == "approve"
         assert mock_call.call_args.kwargs["task"] == "approval"
         assert mock_call.call_args.kwargs["temperature"] == 0
+
+    def test_smart_approval_compares_command_to_trusted_user_request(self):
+        response = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="APPROVE"))]
+        )
+        token = approval_context.set_current_request_authorization(
+            source="explicit_desktop_user",
+            user_request="open Notes",
+            delegated_task="Open Notes on this Mac",
+        )
+        try:
+            with mock_patch("agent.auxiliary_client.call_llm", return_value=response) as mock_call:
+                assert _smart_approve("open -a Notes", "application launch") == "approve"
+        finally:
+            approval_context.reset_current_request_authorization(token)
+
+        system_prompt = mock_call.call_args.kwargs["messages"][0]["content"]
+        assert "TRUSTED USER AUTHORIZATION" in system_prompt
+        assert "open Notes" in system_prompt
+        assert "Open Notes on this Mac" in system_prompt
+        assert "open -a Notes" not in system_prompt
+
+    def test_explicit_request_never_bypasses_the_hardline_floor(self):
+        token = approval_context.set_current_request_authorization(
+            source="explicit_desktop_user",
+            user_request="clean my Mac",
+            delegated_task="clean up storage",
+        )
+        try:
+            result = approval_module.check_all_command_guards("rm -rf /", "local")
+        finally:
+            approval_context.reset_current_request_authorization(token)
+
+        assert result["approved"] is False
+        assert "BLOCKED" in result["message"]
 
     def test_smart_approval_does_not_allowlist_the_pattern_for_session(self, monkeypatch):
         session_key = "test-smart-per-command"

@@ -51,6 +51,7 @@ def test_delegate_returns_immediately_then_runs_exact_request_in_an_isolated_her
     threads = []
     agents = []
     entered = []
+    scoped_requests = []
     results = []
 
     class Scope:
@@ -67,7 +68,7 @@ def test_delegate_returns_immediately_then_runs_exact_request_in_an_isolated_her
 
     bridge = HermesWorkerBridge(
         make_agent=make_agent,
-        worker_scope=lambda _worker_id: Scope(),
+        worker_scope=lambda _worker_id, request: scoped_requests.append(request) or Scope(),
         build_message=lambda agent, text, attachments: {
             "text": text,
             "paths": [item["path"] for item in attachments],
@@ -87,6 +88,7 @@ def test_delegate_returns_immediately_then_runs_exact_request_in_an_isolated_her
     threads[0].target()
 
     assert entered == ["enter", "exit"]
+    assert scoped_requests == [_request()]
     assert agents[0][0] == "worker-one"
     agent = agents[0][1]
     assert agent.stream_delta_callback is None
@@ -122,7 +124,7 @@ def test_worker_failure_is_a_truthful_internal_result_not_a_false_completion():
 
     bridge = HermesWorkerBridge(
         make_agent=lambda _worker_id: FakeAgent(error=RuntimeError("provider unavailable")),
-        worker_scope=lambda _worker_id: Scope(),
+        worker_scope=lambda _worker_id, _request: Scope(),
         build_message=lambda _agent, text, _attachments: text,
         on_result=lambda result: (results.append(result), result_ready.set()),
         id_factory=lambda: "worker-failed",
@@ -150,7 +152,7 @@ def test_empty_hermes_final_is_reported_as_failure_instead_of_inventing_success(
 
     bridge = HermesWorkerBridge(
         make_agent=lambda _worker_id: FakeAgent({"final_response": "  "}),
-        worker_scope=lambda _worker_id: Scope(),
+        worker_scope=lambda _worker_id, _request: Scope(),
         build_message=lambda _agent, text, _attachments: text,
         on_result=results.append,
         thread_factory=lambda target: threads.append(ControlledThread(target)) or threads[-1],
@@ -195,7 +197,7 @@ def test_completed_worker_follow_up_resumes_the_same_hermes_transcript():
 
     bridge = HermesWorkerBridge(
         make_agent=make_agent,
-        worker_scope=lambda _worker_id: Scope(),
+        worker_scope=lambda _worker_id, _request: Scope(),
         build_message=lambda _agent, text, _attachments: text,
         load_history=lambda worker_id: prior if worker_id == "worker-one" else [],
         on_started=lambda request, worker_id, resumed: started.append((request, worker_id, resumed)),
