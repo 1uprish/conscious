@@ -179,6 +179,26 @@ def test_valid_finn_actions_get_the_mechanical_finish_marker_when_model_omits_it
     asyncio.run(scenario())
 
 
+def test_empty_optional_worker_id_is_treated_as_not_supplied():
+    async def scenario():
+        planner = FinnConversationPlanner(
+            complete=lambda **_kwargs: _response(
+                ("send_message", {"text": "on it"}),
+                ("delegate", {"task": "open Notes", "worker_id": ""}),
+            ),
+        )
+
+        actions = await planner.plan(
+            _envelope("user", "open Notes"),
+            main_runtime={"model": "m"},
+        )
+
+        assert actions[1] == {"name": "delegate", "arguments": {"task": "open Notes"}}
+        assert actions[-1]["name"] == "finish_turn"
+
+    asyncio.run(scenario())
+
+
 def test_current_conversation_and_follow_up_workers_are_private_planner_context():
     async def scenario():
         captured = {}
