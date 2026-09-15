@@ -160,6 +160,25 @@ def test_worker_turn_removes_delegate_from_the_available_tool_surface():
     asyncio.run(scenario())
 
 
+def test_valid_finn_actions_get_the_mechanical_finish_marker_when_model_omits_it():
+    async def scenario():
+        planner = FinnConversationPlanner(
+            complete=lambda **_kwargs: _response(("send_message", {"text": "hey you"})),
+        )
+
+        actions = await planner.plan(
+            _envelope("user", "Hey, what's up?"),
+            main_runtime={"model": "m"},
+        )
+
+        assert actions == [
+            {"name": "send_message", "arguments": {"text": "hey you"}},
+            {"name": "finish_turn", "arguments": {}},
+        ]
+
+    asyncio.run(scenario())
+
+
 def test_current_conversation_and_follow_up_workers_are_private_planner_context():
     async def scenario():
         captured = {}
@@ -212,7 +231,6 @@ def test_current_conversation_and_follow_up_workers_are_private_planner_context(
     [
         (SimpleNamespace(choices=[]), "one choice"),
         (_response(), "tool action"),
-        (_response(("send_message", {"text": "hi"})), "finish_turn"),
         (_response(("unknown", {}), ("finish_turn", {})), "unsupported"),
     ],
 )
