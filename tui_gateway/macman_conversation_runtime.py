@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+import logging
 from collections.abc import Callable
 from typing import Any
 
@@ -11,6 +12,9 @@ from tui_gateway.macman_conversation_actions import (
     ConversationActionExecutor,
 )
 from tui_gateway.macman_conversation_planner import ConversationPlanError
+
+
+logger = logging.getLogger(__name__)
 
 
 async def _resolve(value: Any) -> Any:
@@ -51,7 +55,16 @@ class MacManConversationRuntime:
                 main_runtime=self._current_runtime(),
                 conversation_context=context,
             )
-        except Exception:
+        except Exception as exc:
+            logger.warning(
+                "Finn conversation planning failed; falling back to Hermes "
+                "source=%s message_id=%s error=%s: %s",
+                envelope.get("source"),
+                envelope.get("message_id"),
+                type(exc).__name__,
+                exc,
+                exc_info=True,
+            )
             return await self._fallback(envelope)
         try:
             executor = ConversationActionExecutor(
