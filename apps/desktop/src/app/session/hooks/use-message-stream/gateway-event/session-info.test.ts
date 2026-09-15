@@ -3,10 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ClientSessionState } from '@/app/types'
 import { createClientSessionState } from '@/lib/chat-runtime'
 import {
+  $activeSessionId,
   $currentCwd,
   $selectedStoredSessionId,
   $workspaceCwdOwner,
   releaseWorkspaceCwdOwner,
+  setActiveSessionId,
   setCurrentCwd
 } from '@/store/session'
 
@@ -56,12 +58,14 @@ function sessionInfoEvent({
 
 describe('handleSessionInfoEvent workspace ownership', () => {
   beforeEach(() => {
+    setActiveSessionId(null)
     $selectedStoredSessionId.set(null)
     $workspaceCwdOwner.set(null)
     setCurrentCwd('')
   })
 
   afterEach(() => {
+    setActiveSessionId(null)
     $selectedStoredSessionId.set(null)
     $workspaceCwdOwner.set(null)
     setCurrentCwd('')
@@ -145,5 +149,41 @@ describe('handleSessionInfoEvent workspace ownership', () => {
     handleSessionInfoEvent(ctx)
 
     expect(next).toBe(original)
+  })
+
+  it('carries the visible transcript onto a replacement runtime', () => {
+    const oldState = {
+      ...createClientSessionState('stored-1'),
+      messages: [{ id: 'user-1', role: 'user' as const, parts: [{ type: 'text' as const, text: 'still visible' }] }]
+    }
+    const states = new Map<string, ClientSessionState>([['runtime-old', oldState]])
+    const ctx = sessionInfoEvent({
+      activeSessionId: 'runtime-old',
+      cwd: '/repo/mine',
+      explicitSid: 'runtime-new',
+      storedSessionId: 'stored-1'
+    })
+
+    $selectedStoredSessionId.set('stored-1')
+    setActiveSessionId('runtime-old')
+    ctx.deps.sessionStateByRuntimeIdRef.current = states
+    ctx.deps.updateSessionState = vi.fn(
+      (
+        sessionId: string,
+        updater: (state: ClientSessionState) => ClientSessionState,
+        storedSessionId?: string | null
+      ) => {
+        const next = updater(states.get(sessionId) ?? createClientSessionState(storedSessionId ?? null))
+        states.set(sessionId, next)
+
+        return next
+      }
+    )
+
+    handleSessionInfoEvent(ctx)
+
+    expect($activeSessionId.get()).toBe('runtime-new')
+    expect(ctx.deps.activeSessionIdRef.current).toBe('runtime-new')
+    expect(states.get('runtime-new')?.messages).toEqual(oldState.messages)
   })
 })
