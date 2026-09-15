@@ -357,6 +357,13 @@ declare global {
        *  (HERMES_GUEST_ONBOARDING=1 or --guest-onboarding). Read-only fact the
        *  main process also stamps onto every backend it spawns. */
       guestOnboardingEnabled?: boolean
+      stalker?: {
+        disable: () => Promise<import('./macman/macman-stalker').MacManStalkerSnapshot>
+        enable: () => Promise<import('./macman/macman-stalker').MacManStalkerSnapshot>
+        open: () => Promise<void>
+        retry: () => Promise<import('./macman/macman-stalker').MacManStalkerSnapshot>
+        snapshot: () => Promise<import('./macman/macman-stalker').MacManStalkerSnapshot>
+      }
       /** Launch flag: skip the first-run film (HERMES_SKIP_INTRO=1 or
        *  --skip-intro) so a fresh HERMES_HOME lands on the guided chat. */
       skipIntro?: boolean

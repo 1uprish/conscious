@@ -17,7 +17,6 @@ import {
   Bell,
   Brain,
   ChevronRight,
-  Eye,
   Info,
   Lock,
   MessageCircle,
@@ -38,6 +37,7 @@ import {
 } from '@/store/updates'
 
 import { DEFERRED_MACMAN_CAPABILITIES, type MacManView } from './navigation'
+import { MacManStalker } from './macman-stalker'
 
 type DetailView = Exclude<MacManView, 'chat'>
 
@@ -280,19 +280,10 @@ function PermissionsPage() {
         </div>
       </div>
 
-      <SectionTitle detail="Optional local activity history. The recorder is not bundled in this fresh build yet.">
+      <SectionTitle detail="Optional native activity history that stays on this Mac.">
         Continuous awareness
       </SectionTitle>
-      <div className="mm-inset-card mm-stalker-card">
-        <span className="mm-row-symbol">
-          <Eye aria-hidden />
-        </span>
-        <span className="mm-row-copy">
-          <strong>Stalker</strong>
-          <small>When installed, this stays local and depends on Screen Recording permission.</small>
-        </span>
-        <StatusBadge status="unavailable" />
-      </div>
+      <MacManStalker />
 
       <SectionTitle detail="Both permissions are required for reliable computer control.">
         Computer control

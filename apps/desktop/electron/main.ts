@@ -97,6 +97,7 @@ import {
 import { detectBundleSkew } from './bundle-skew'
 import { detectBundleSwap } from './bundle-swap'
 import { registerChatOnboardingWindow } from './chat-onboarding-window'
+import { createStalkerDesktopService } from './stalker-desktop-service'
 import { writeComposerPaste } from './composer-paste'
 import { applyConnectionChange, teardownSshState } from './connection-apply'
 import {
@@ -927,6 +928,14 @@ const BOOT_FAKE_STEP_MS = (() => {
 })()
 
 const APP_NAME = process.env.HERMES_DESKTOP_APP_NAME || 'MacMan'
+const stalkerDesktopService = createStalkerDesktopService({
+  allowDevelopmentFallback: !app.isPackaged,
+  appRoot: APP_ROOT,
+  enabled: IS_MAC,
+  log: message => rememberLog(message),
+  resourcesPath: process.resourcesPath,
+  userDataPath: app.getPath('userData')
+})
 const HUD_WINDOW_TITLE = `${APP_NAME} HUD`
 const TITLEBAR_HEIGHT = 34
 const MACOS_TRAFFIC_LIGHTS_HEIGHT = 14
@@ -17637,6 +17646,12 @@ function showAboutPanelFresh() {
     app.showAboutPanel()
   })
 }
+
+ipcMain.handle('macman:stalker:snapshot', () => stalkerDesktopService.snapshot())
+ipcMain.handle('macman:stalker:enable', () => stalkerDesktopService.enable())
+ipcMain.handle('macman:stalker:disable', () => stalkerDesktopService.disable())
+ipcMain.handle('macman:stalker:retry', () => stalkerDesktopService.retry())
+ipcMain.handle('macman:stalker:open', () => stalkerDesktopService.openStalker())
 
 ipcMain.handle('hermes:version', async () => {
   const skew = await detectRendererSkew()

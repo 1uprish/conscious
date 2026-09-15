@@ -470,6 +470,17 @@ body,
   grid-template-columns: 34px minmax(0, 1fr) auto;
 }
 
+.mm-stalker-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mm-stalker-error {
+  color: #ff453a !important;
+  white-space: normal;
+}
+
 .mm-embedded-control {
   padding: 14px;
 }
