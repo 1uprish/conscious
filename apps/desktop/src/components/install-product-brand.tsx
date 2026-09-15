@@ -38,7 +38,7 @@ export function InstallProductMark({
   productName: InstallProductName
 }) {
   return productName === 'MacMan' ? (
-    <img alt="" className={className} src="./macman-mark-transparent.png" />
+    <img alt="" className={className} src="./macman-mark.svg" />
   ) : (
     <BrandMark className={className} />
   )

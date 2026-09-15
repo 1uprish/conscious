@@ -455,7 +455,7 @@ function AboutPage() {
 
   return (
     <Surface className="mm-about-page">
-      <img alt="MacMan" className="mm-about-mark" src="./macman-mark-transparent.png" />
+      <img alt="MacMan" className="mm-about-mark" src="./macman-mark.svg" />
       <h2>MacMan</h2>
       <p>Personal assistant for this Mac.</p>
       <div className="mm-about-grid">

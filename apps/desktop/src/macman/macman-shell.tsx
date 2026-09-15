@@ -32,7 +32,7 @@ function MacManSidebar({ active, onSelect }: { active: MacManView; onSelect: (vi
     <aside aria-label="MacMan" className="mm-sidebar">
       <div aria-hidden className="mm-window-drag" />
       <div className="mm-brand">
-        <img alt="" className="mm-brand-mark" src="./macman-mark-transparent.png" />
+        <img alt="" className="mm-brand-mark" src="./macman-mark.svg" />
         <span>
           <strong>MacMan</strong>
           <small>Personal assistant</small>
