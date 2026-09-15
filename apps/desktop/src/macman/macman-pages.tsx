@@ -2,13 +2,13 @@ import { useStore } from '@nanostores/react'
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 
 import { MessagingView } from '@/app/messaging'
-import { SkillsView } from '@/app/skills'
+import { AppearanceSettings } from '@/app/settings/appearance-settings'
+import { ComputerUsePanel } from '@/app/settings/computer-use-panel'
 import { ConfigSettings } from '@/app/settings/config-settings'
 import { NotificationsSettings } from '@/app/settings/notifications-settings'
-import { type ProviderView, ProvidersSettings } from '@/app/settings/providers-settings'
-import { ComputerUsePanel } from '@/app/settings/computer-use-panel'
-import { AppearanceSettings } from '@/app/settings/appearance-settings'
+import { ProvidersSettings, type ProviderView } from '@/app/settings/providers-settings'
 import { VaultSettings } from '@/app/settings/vault-settings'
+import { SkillsView } from '@/app/skills'
 import { Button } from '@/components/ui/button'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { getComputerUseStatus, getGlobalModelInfo, getMemoryStatus, getMessagingPlatforms } from '@/hermes'
@@ -27,6 +27,7 @@ import {
   ShieldLock,
   Zap
 } from '@/lib/icons'
+import { $gatewayState } from '@/store/session'
 import {
   $desktopVersion,
   $updateChecking,
@@ -35,7 +36,6 @@ import {
   openUpdateOverlayFor,
   refreshDesktopVersion
 } from '@/store/updates'
-import { $gatewayState } from '@/store/session'
 
 import { DEFERRED_MACMAN_CAPABILITIES, type MacManView } from './navigation'
 
@@ -153,34 +153,41 @@ function SetupPage({ onNavigate }: { onNavigate: (view: MacManView) => void }) {
   const [snapshot, setSnapshot] = useState(INITIAL_SETUP)
   const generation = useRef(0)
 
+  const invalidateRefresh = useCallback(() => {
+    generation.current += 1
+  }, [])
+
   const refresh = useCallback(() => {
     const request = ++generation.current
     setSnapshot(INITIAL_SETUP)
 
-    void Promise.allSettled([getGlobalModelInfo(), getComputerUseStatus(), getMessagingPlatforms(), getMemoryStatus()]).then(
-      results => {
-        if (request !== generation.current) {
-          return
-        }
-
-        const [model, computer, messaging, memory] = results
-        setSnapshot(
-          deriveSetupSnapshot({
-            computer: computer.status === 'fulfilled' ? computer.value : undefined,
-            memory: memory.status === 'fulfilled' ? memory.value : undefined,
-            messaging: messaging.status === 'fulfilled' ? messaging.value.platforms : undefined,
-            model: model.status === 'fulfilled' ? model.value : undefined
-          })
-        )
+    void Promise.allSettled([
+      getGlobalModelInfo(),
+      getComputerUseStatus(),
+      getMessagingPlatforms(),
+      getMemoryStatus()
+    ]).then(results => {
+      if (request !== generation.current) {
+        return
       }
-    )
+
+      const [model, computer, messaging, memory] = results
+      setSnapshot(
+        deriveSetupSnapshot({
+          computer: computer.status === 'fulfilled' ? computer.value : undefined,
+          memory: memory.status === 'fulfilled' ? memory.value : undefined,
+          messaging: messaging.status === 'fulfilled' ? messaging.value.platforms : undefined,
+          model: model.status === 'fulfilled' ? model.value : undefined
+        })
+      )
+    })
   }, [])
 
   useEffect(() => {
     refresh()
 
-    return () => void ++generation.current
-  }, [refresh])
+    return invalidateRefresh
+  }, [invalidateRefresh, refresh])
 
   return (
     <Surface>
@@ -287,7 +294,9 @@ function PermissionsPage() {
         <StatusBadge status="unavailable" />
       </div>
 
-      <SectionTitle detail="Both permissions are required for reliable computer control.">Computer control</SectionTitle>
+      <SectionTitle detail="Both permissions are required for reliable computer control.">
+        Computer control
+      </SectionTitle>
       <div className="mm-inset-card mm-embedded-control">
         <ComputerUsePanel />
       </div>
@@ -433,6 +442,7 @@ function AboutPage() {
   }, [])
 
   const updateAvailable = Boolean(update?.updateAvailable || (update?.behind ?? 0) > 0)
+
   const updateLabel = checking
     ? 'Checking for updates…'
     : update?.error
@@ -488,32 +498,46 @@ export function MacManPages({ onNavigate, view }: MacManPagesProps) {
   switch (view) {
     case 'setup':
       return <SetupPage onNavigate={onNavigate} />
+
     case 'permissions':
       return <PermissionsPage />
+
     case 'general':
       return <GeneralPage />
+
     case 'models':
       return <ModelsPage />
+
     case 'messaging':
       return <MessagingView />
+
     case 'voice':
       return <ConfigPage section="voice" />
+
     case 'notifications':
       return <NotificationsSettings />
+
     case 'browser':
       return <BrowserPage />
+
     case 'memory':
       return <ConfigPage section="memory" />
+
     case 'privacy':
       return <ConfigPage section="safety" />
+
     case 'workspace':
       return <ConfigPage section="workspace" />
+
     case 'capabilities':
       return <SkillsView embedded />
+
     case 'advanced':
       return <ConfigPage section="advanced" />
+
     case 'about':
       return <AboutPage />
+
     default:
       return <UnsupportedView view={view} />
   }
