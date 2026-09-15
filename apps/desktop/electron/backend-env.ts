@@ -132,6 +132,15 @@ function buildDesktopBackendEnv({
 
   return {
     PYTHONPATH: appendUniquePathEntries([...pythonPathEntries, currentPythonPath], { delimiter }),
+    // A packaged backend imports directly from Contents/Resources. Bytecode
+    // written beside those modules mutates the signed app after first launch,
+    // invalidating its code seal. Keep every desktop backend isolated as well:
+    // user-site packages and the script/current directory must not outrank the
+    // runtime selected above. These are the environment equivalents of the
+    // immutable packaged entrypoint's `-B -s -P` flags.
+    PYTHONDONTWRITEBYTECODE: '1',
+    PYTHONNOUSERSITE: '1',
+    PYTHONSAFEPATH: '1',
     // Force PEP 540 UTF-8 mode in the spawned Python backend so its stdio and
     // subprocess defaults are UTF-8 even on non-UTF-8 Windows locales (GBK,
     // cp1252, ...). hermes_bootstrap sets this inside the child too, but only
