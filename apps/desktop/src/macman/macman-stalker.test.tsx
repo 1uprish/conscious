@@ -1,9 +1,16 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
 import { MacManStalker } from './macman-stalker'
 
-afterEach(() => vi.restoreAllMocks())
+beforeEach(() => {
+  Object.defineProperty(window, 'hermesDesktop', { configurable: true, value: {} })
+})
+
+afterEach(() => {
+  Reflect.deleteProperty(window, 'hermesDesktop')
+  vi.restoreAllMocks()
+})
 
 test('shows the native Stalker state and enables it from one explicit action', async () => {
   const snapshot = vi.fn(async () => ({
@@ -23,16 +30,16 @@ test('shows the native Stalker state and enables it from one explicit action', a
   })
 
   render(<MacManStalker />)
-  expect(await screen.findByText('Off')).toBeInTheDocument()
+  expect(await screen.findByText('Off')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'Turn on Stalker' }))
   await waitFor(() => expect(enable).toHaveBeenCalledOnce())
-  expect(await screen.findByText('Running')).toBeInTheDocument()
+  expect(await screen.findByText('Running')).toBeTruthy()
 })
 
 test('reports an unavailable bridge truthfully', async () => {
   const previous = window.hermesDesktop.stalker
   delete window.hermesDesktop.stalker
   render(<MacManStalker />)
-  expect(await screen.findByText('Unavailable')).toBeInTheDocument()
+  expect(await screen.findByText('Unavailable')).toBeTruthy()
   window.hermesDesktop.stalker = previous
 })
