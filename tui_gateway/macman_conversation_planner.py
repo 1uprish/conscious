@@ -125,6 +125,13 @@ def _parse_actions(response: object) -> list[dict]:
     return actions
 
 
+def _ensure_finish_turn(actions: list[dict]) -> list[dict]:
+    """Close a valid one-shot plan when Finn leaves its no-op stop marker for a next step."""
+    if actions and not any(action.get("name") == "finish_turn" for action in actions):
+        return [*actions, {"name": "finish_turn", "arguments": {}}]
+    return actions
+
+
 async def _default_complete(**kwargs):
     from agent.auxiliary_client import async_call_llm
 
@@ -189,7 +196,7 @@ class FinnConversationPlanner:
         )
         if inspect.isawaitable(response):
             response = await response
-        actions = _parse_actions(response)
+        actions = _ensure_finish_turn(_parse_actions(response))
         try:
             ConversationActionExecutor._validated_actions(source, actions)
         except ConversationActionError as exc:
