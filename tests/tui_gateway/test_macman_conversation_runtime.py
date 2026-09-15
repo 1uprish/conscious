@@ -29,7 +29,7 @@ def test_social_turn_stays_in_finn_and_never_runs_hermes():
         class Planner:
             async def plan(self, envelope, *, main_runtime, conversation_context=None):
                 assert envelope["content"] == "hey"
-                assert main_runtime == {"model": "current"}
+                assert callable(main_runtime)
                 assert conversation_context is None
                 return [
                     {"name": "send_message", "arguments": {"text": "hey, what's up?"}},
@@ -38,7 +38,9 @@ def test_social_turn_stays_in_finn_and_never_runs_hermes():
 
         runtime = MacManConversationRuntime(
             planner=Planner(),
-            current_runtime=lambda: {"model": "current"},
+            current_runtime=lambda: (_ for _ in ()).throw(
+                AssertionError("social turn must not wait for Hermes")
+            ),
             deliver=delivered.append,
             delegate=delegated.append,
             fail_open=lambda _turn: None,
@@ -75,7 +77,11 @@ def test_zero_latency_identity_does_not_wait_for_the_hermes_agent_build():
         result = await runtime.handle(_turn(content="What do I call you?"))
 
         assert delivered == ["macman"]
-        assert result["fallback"] is False
+        assert result == {
+            "delivered": ["macman"],
+            "delegated": False,
+            "waited": False,
+        }
 
     asyncio.run(scenario())
 

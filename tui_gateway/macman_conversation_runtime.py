@@ -52,7 +52,7 @@ class MacManConversationRuntime:
             )
             actions = await self._planner.plan(
                 envelope,
-                main_runtime=self._current_runtime(),
+                main_runtime=self._current_runtime,
                 conversation_context=context,
             )
         except Exception as exc:

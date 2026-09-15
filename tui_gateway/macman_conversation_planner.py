@@ -199,7 +199,7 @@ class FinnConversationPlanner:
         self,
         envelope: dict,
         *,
-        main_runtime: dict,
+        main_runtime: dict | Callable[[], dict],
         conversation_context: dict | None = None,
     ) -> list[dict]:
         source = envelope.get("source")
@@ -207,6 +207,8 @@ class FinnConversationPlanner:
             raise ConversationPlanError("unsupported conversation source")
         if fast_actions := _fast_social_actions(envelope):
             return fast_actions
+        if callable(main_runtime):
+            main_runtime = main_runtime()
         response = self._complete(
             task="conversation",
             main_runtime=main_runtime,
