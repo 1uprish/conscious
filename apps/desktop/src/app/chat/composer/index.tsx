@@ -16,6 +16,7 @@ import { PR_COMMENT_URL_RE } from '@/lib/chat-runtime'
 import { sanitizeComposerInput } from '@/lib/composer-input-sanitize'
 import { DATA_IMAGE_URL_RE } from '@/lib/embedded-images'
 import { triggerHaptic } from '@/lib/haptics'
+import { useProductPresentation } from '@/lib/product-presentation'
 import { useStoresSelector } from '@/lib/use-session-slice'
 import { cn } from '@/lib/utils'
 import { interceptsTypedVoiceStop } from '@/lib/voice-stop-word'
@@ -123,6 +124,7 @@ export function ChatBar({
   onSubmit: onSubmitProp,
   onTranscribeAudio
 }: ChatBarProps) {
+  const presentation = useProductPresentation()
   const hudMode = useStore($hudMode)
   const hudWindowing = window.hermesDesktop?.hud?.windowing
   const hudNativeDrag = hudMode && hudWindowing?.nativeDrag === true
@@ -368,10 +370,18 @@ export function ChatBar({
   // into a tool result) and never for a slash command (those execute inline).
   // A blocking prompt (approval/sudo/secret) also rules it out: the tool batch
   // is parked on the user, so a steer can't reach the model — text queues.
-  const canSteer = busy && !compacting && !blockingPrompt && !!onSteer && attachments.length === 0 && isSteerableText
+  const canSteer =
+    !presentation.queueBusyMessages &&
+    busy &&
+    !compacting &&
+    !blockingPrompt &&
+    !!onSteer &&
+    attachments.length === 0 &&
+    isSteerableText
 
-  // While busy: text redirects the live turn (Cursor-style stop-and-correct),
-  // attachments queue for the next turn, an empty composer stops.
+  // Stock Hermes redirects text into the live turn (Cursor-style stop-and-
+  // correct). MacMan preserves conversational turns, so its presentation
+  // queues every non-command payload while busy. An empty composer stops.
   const busyAction: 'steer' | 'queue' | 'stop' = canSteer
     ? 'steer'
     : compacting || hasComposerPayload
@@ -401,6 +411,7 @@ export function ChatBar({
     onSteer,
     onSteerHidden,
     onSubmit,
+    queueBusyMessages: presentation.queueBusyMessages,
     queueCurrentDraft,
     queueEdit,
     queuedPrompts,

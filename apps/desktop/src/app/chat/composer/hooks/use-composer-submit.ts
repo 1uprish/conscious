@@ -36,6 +36,7 @@ interface UseComposerSubmitArgs {
   onSteer: ChatBarProps['onSteer']
   onSteerHidden: ChatBarProps['onSteerHidden']
   onSubmit: ChatBarProps['onSubmit']
+  queueBusyMessages: boolean
   queueCurrentDraft: () => boolean
   queueEdit: QueueEditState | null
   queuedPrompts: QueuedPromptEntry[]
@@ -72,6 +73,7 @@ export function useComposerSubmit({
   onSteer,
   onSteerHidden,
   onSubmit,
+  queueBusyMessages,
   queueCurrentDraft,
   queueEdit,
   queuedPrompts,
@@ -168,6 +170,7 @@ export function useComposerSubmit({
           }
 
           if (
+            !queueBusyMessages &&
             current.onSteer &&
             !current.compacting &&
             !hasBlockingPromptRequest(sessionId) &&
@@ -186,7 +189,7 @@ export function useComposerSubmit({
           }
         }
       }),
-    [activeQueueSessionKeyRef, inputDisabled, paneVisible, scope.target, sessionId, surfaceId]
+    [activeQueueSessionKeyRef, inputDisabled, paneVisible, queueBusyMessages, scope.target, sessionId, surfaceId]
   )
 
   const submitDraft = () => {
@@ -262,10 +265,10 @@ export function useComposerSubmit({
         triggerHaptic('submit')
         clearDraft()
         dispatchSubmit(text)
-      } else if (!compacting && !blockingPrompt && !attachments.length && text.trim()) {
-        // Cursor-style stop-and-correct: interrupt the live turn and redirect
-        // it with this text. redirect() preserves the shown reasoning/work; if
-        // the turn already ended, steerDraft re-queues so nothing is lost.
+      } else if (!queueBusyMessages && !compacting && !blockingPrompt && !attachments.length && text.trim()) {
+        // Stock Hermes uses Cursor-style stop-and-correct here. MacMan keeps
+        // this branch disabled so each conversational message becomes a
+        // durable queued turn instead of rewriting the request in flight.
         steerDraft()
       } else if (payloadPresent) {
         // Attachments can't ride a redirect (no tool-result image carriage) —

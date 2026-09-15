@@ -115,6 +115,7 @@ function renderSubmitHook({
         onSteer,
         onSteerHidden,
         onSubmit,
+        queueBusyMessages: false,
         queueCurrentDraft,
         queueEdit: null,
         queuedPrompts: [],

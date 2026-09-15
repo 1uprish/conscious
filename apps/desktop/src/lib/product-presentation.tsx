@@ -2,18 +2,23 @@ import { createContext, type ReactNode, useContext } from 'react'
 
 export interface ProductPresentation {
   name: string
+  queueBusyMessages: boolean
   showWakeWord: boolean
   wordmark: string
 }
 
 const HERMES_PRESENTATION: ProductPresentation = {
   name: 'Hermes',
+  queueBusyMessages: false,
   showWakeWord: true,
   wordmark: 'HERMES AGENT'
 }
 
 export const MACMAN_PRESENTATION: ProductPresentation = {
   name: 'MacMan',
+  // MacMan is a continuous personal conversation. A new user message is a
+  // durable next turn, not a Cursor-style rewrite of work already in flight.
+  queueBusyMessages: true,
   // The bundled on-device acoustic model recognizes "hey hermes". Hiding
   // that control is more honest than relabeling it "hey macman" while the
   // detector still listens for a different phrase.
