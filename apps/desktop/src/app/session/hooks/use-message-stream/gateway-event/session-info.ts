@@ -104,6 +104,8 @@ function maybeRebindPaneToRebuiltRuntime(ctx: GatewayEventContext): boolean {
     return false
   }
 
+  const replacementStoredSessionId = payload.stored_session_id
+
   const selected = $selectedStoredSessionId.get()
 
   // A rebuilt runtime announces itself for a conversation that is already
@@ -134,8 +136,8 @@ function maybeRebindPaneToRebuiltRuntime(ctx: GatewayEventContext): boolean {
   if (oldState && !deps.sessionStateByRuntimeIdRef.current.has(explicitSid)) {
     deps.updateSessionState(
       explicitSid,
-      () => ({ ...oldState, storedSessionId: payload.stored_session_id }),
-      payload.stored_session_id
+      () => ({ ...oldState, storedSessionId: replacementStoredSessionId }),
+      replacementStoredSessionId
     )
   }
 
