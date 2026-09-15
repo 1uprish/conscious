@@ -7,6 +7,8 @@ import { ConfigSettings } from '@/app/settings/config-settings'
 import { NotificationsSettings } from '@/app/settings/notifications-settings'
 import { type ProviderView, ProvidersSettings } from '@/app/settings/providers-settings'
 import { ComputerUsePanel } from '@/app/settings/computer-use-panel'
+import { AppearanceSettings } from '@/app/settings/appearance-settings'
+import { VaultSettings } from '@/app/settings/vault-settings'
 import { Button } from '@/components/ui/button'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { getComputerUseStatus, getGlobalModelInfo, getMemoryStatus, getMessagingPlatforms } from '@/hermes'
@@ -25,7 +27,14 @@ import {
   ShieldLock,
   Zap
 } from '@/lib/icons'
-import { $desktopVersion, refreshDesktopVersion } from '@/store/updates'
+import {
+  $desktopVersion,
+  $updateChecking,
+  $updateStatus,
+  checkUpdates,
+  openUpdateOverlayFor,
+  refreshDesktopVersion
+} from '@/store/updates'
 import { $gatewayState } from '@/store/session'
 
 import { DEFERRED_MACMAN_CAPABILITIES, type MacManView } from './navigation'
@@ -346,7 +355,24 @@ function ConfigPage({
 }
 
 function GeneralPage() {
-  return <ConfigPage section="chat" />
+  const [view, setView] = useState<'appearance' | 'conversation'>('appearance')
+
+  return (
+    <div className="mm-settings-page">
+      <div className="mm-segmented-wrap">
+        <SegmentedControl
+          aria-label="General settings"
+          onChange={value => setView(value as 'appearance' | 'conversation')}
+          options={[
+            { id: 'appearance', label: 'Appearance' },
+            { id: 'conversation', label: 'Conversation' }
+          ]}
+          value={view}
+        />
+      </div>
+      {view === 'appearance' ? <AppearanceSettings /> : <ConfigPage section="chat" />}
+    </div>
+  )
 }
 
 function ModelsPage() {
@@ -376,12 +402,46 @@ function ModelsPage() {
   )
 }
 
+function BrowserPage() {
+  const [view, setView] = useState<'browser' | 'vault'>('browser')
+
+  return (
+    <div className="mm-settings-page">
+      <div className="mm-segmented-wrap">
+        <SegmentedControl
+          aria-label="Browser settings"
+          onChange={value => setView(value as 'browser' | 'vault')}
+          options={[
+            { id: 'browser', label: 'Browser' },
+            { id: 'vault', label: 'Credential Vault' }
+          ]}
+          value={view}
+        />
+      </div>
+      {view === 'browser' ? <ConfigPage section="browser" /> : <VaultSettings />}
+    </div>
+  )
+}
+
 function AboutPage() {
   const version = useStore($desktopVersion)
+  const update = useStore($updateStatus)
+  const checking = useStore($updateChecking)
 
   useEffect(() => {
     void refreshDesktopVersion()
   }, [])
+
+  const updateAvailable = Boolean(update?.updateAvailable || (update?.behind ?? 0) > 0)
+  const updateLabel = checking
+    ? 'Checking for updates…'
+    : update?.error
+      ? 'Update check failed'
+      : updateAvailable
+        ? 'Update available'
+        : update
+          ? 'MacMan is up to date'
+          : 'Not checked yet'
 
   return (
     <Surface className="mm-about-page">
@@ -395,6 +455,19 @@ function AboutPage() {
         <strong>Built-in agent runtime</strong>
         <span>Conversation</span>
         <strong>Continuous, local desktop session</strong>
+        <span>Updates</span>
+        <strong>{updateLabel}</strong>
+      </div>
+      <div className="mm-about-actions">
+        <Button disabled={checking} onClick={() => void checkUpdates({ force: true })} size="sm" variant="outline">
+          <RefreshCw />
+          Check for Updates
+        </Button>
+        {updateAvailable ? (
+          <Button onClick={() => openUpdateOverlayFor('client')} size="sm">
+            Review Update
+          </Button>
+        ) : null}
       </div>
       <p className="mm-about-note">
         Runtime names are intentionally technical detail. MacMan is the product identity shown throughout the app.
@@ -428,7 +501,7 @@ export function MacManPages({ onNavigate, view }: MacManPagesProps) {
     case 'notifications':
       return <NotificationsSettings />
     case 'browser':
-      return <ConfigPage section="browser" />
+      return <BrowserPage />
     case 'memory':
       return <ConfigPage section="memory" />
     case 'privacy':

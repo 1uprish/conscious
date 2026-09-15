@@ -549,6 +549,14 @@ body,
   font-size: 11px !important;
 }
 
+.mm-about-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
 /* Existing Hermes-backed settings stay functionally canonical while their
    content is presented inside MacMan's detail column. */
 .mm-settings-host > .h-full,
