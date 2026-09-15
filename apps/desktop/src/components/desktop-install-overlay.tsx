@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { BrandMark } from '@/components/brand-mark'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { ErrorIcon } from '@/components/ui/error-state'
@@ -20,6 +19,7 @@ import { capitalize } from '@/lib/text'
 import { cn } from '@/lib/utils'
 
 import { FirstRunRemoteForm } from './first-run-remote-form'
+import { InstallProductMark, type InstallProductName, rebrandInstallCopy } from './install-product-brand'
 
 /**
  * DesktopInstallOverlay
@@ -50,6 +50,7 @@ interface DesktopInstallOverlayProps {
   /** When false, the overlay never renders -- useful for dev when we want
    * to suppress it entirely. */
   enabled?: boolean
+  productName?: InstallProductName
 }
 
 interface StageRowProps {
@@ -268,9 +269,9 @@ function applyEvent(state: DesktopBootstrapState, ev: DesktopBootstrapEvent): De
   return state
 }
 
-export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayProps) {
+export function DesktopInstallOverlay({ enabled = true, productName = 'Hermes' }: DesktopInstallOverlayProps) {
   const { t } = useI18n()
-  const copy = t.install
+  const copy = useMemo(() => rebrandInstallCopy(t.install, productName), [productName, t.install])
 
   const [state, setState] = useState<DesktopBootstrapState>(EMPTY_STATE)
   const [logOpen, setLogOpen] = useState(false)
@@ -393,7 +394,7 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
   }
 
   if (remoteOpen) {
-    return <FirstRunRemoteForm onBack={() => setRemoteOpen(false)} />
+    return <FirstRunRemoteForm onBack={() => setRemoteOpen(false)} productName={productName} />
   }
 
   if (state.setupChoice) {
@@ -401,7 +402,7 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
       <div className="fixed inset-0 z-(--z-setup) flex items-center justify-center bg-background/90 p-4 backdrop-blur-md">
         <div className="w-full max-w-2xl rounded-xl border border-(--stroke-nous) bg-card p-8 shadow-nous">
           <div className="flex items-start gap-4">
-            <BrandMark className="size-11 shrink-0" />
+            <InstallProductMark className="size-11 shrink-0" productName={productName} />
             <div className="min-w-0">
               <h2 className="text-xl font-semibold tracking-tight">{copy.setupChoiceTitle}</h2>
               <p className="mt-1.5 text-sm text-muted-foreground">{copy.setupChoiceDesc}</p>
@@ -551,7 +552,7 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
       <div className="flex w-full max-w-2xl max-h-[90vh] flex-col rounded-xl border border-(--stroke-nous) bg-card shadow-nous">
         {/* Header -- always visible, never scrolls */}
         <div className="flex flex-shrink-0 items-start gap-4 p-8 pb-4">
-          {!failed && <BrandMark className="size-11 shrink-0" />}
+          {!failed && <InstallProductMark className="size-11 shrink-0" productName={productName} />}
           <div className="min-w-0">
             <h2 className="text-xl font-semibold tracking-tight">
               {failed ? copy.failedTitle : state.active ? copy.settingUpTitle : copy.finishingTitle}

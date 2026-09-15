@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { BrandMark } from '@/components/brand-mark'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { DesktopConnectionProbeResult } from '@/global'
@@ -9,20 +8,23 @@ import { deriveRemoteAuthProviderShape } from '@/lib/desktop-remote-auth'
 import { AlertCircle, Check, Loader2, LogIn } from '@/lib/icons'
 import { coerceRemoteUrlScheme } from '@/lib/remote-url'
 
+import { InstallProductMark, type InstallProductName, rebrandInstallCopy } from './install-product-brand'
+
 type AuthMode = 'oauth' | 'token'
 type ProbeStatus = 'idle' | 'probing' | 'done' | 'error'
 
 interface FirstRunRemoteFormProps {
   onBack: () => void
+  productName?: InstallProductName
 }
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err || 'Unknown error')
 }
 
-export function FirstRunRemoteForm({ onBack }: FirstRunRemoteFormProps) {
+export function FirstRunRemoteForm({ onBack, productName = 'Hermes' }: FirstRunRemoteFormProps) {
   const { t } = useI18n()
-  const copy = t.install
+  const copy = useMemo(() => rebrandInstallCopy(t.install, productName), [productName, t.install])
   const [remoteUrl, setRemoteUrl] = useState('')
   const [remoteToken, setRemoteToken] = useState('')
   const [probeStatus, setProbeStatus] = useState<ProbeStatus>('idle')
@@ -226,7 +228,7 @@ export function FirstRunRemoteForm({ onBack }: FirstRunRemoteFormProps) {
     <div className="fixed inset-0 z-(--z-setup) flex items-center justify-center bg-background/90 p-4 backdrop-blur-md">
       <div className="flex w-full max-w-xl flex-col rounded-xl border border-(--stroke-nous) bg-card p-8 shadow-nous">
         <div className="flex items-start gap-4">
-          <BrandMark className="size-11 shrink-0" />
+          <InstallProductMark className="size-11 shrink-0" productName={productName} />
           <div className="min-w-0">
             <h2 className="text-xl font-semibold tracking-tight">{copy.remoteSetupTitle}</h2>
             <p className="mt-1.5 text-sm text-muted-foreground">{copy.remoteSetupDesc}</p>

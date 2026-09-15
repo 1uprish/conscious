@@ -1,10 +1,11 @@
 import { useStore } from '@nanostores/react'
-import { type ReactNode, useMemo, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useState } from 'react'
 
 import { cn } from '@/lib/utils'
 import { $gatewayState } from '@/store/session'
 
 import { ContribWiring, WiredPane } from '../app/contrib/wiring'
+
 import { MacManPages } from './macman-pages'
 import { MACMAN_NAVIGATION, macManNavigationItem, type MacManView } from './navigation'
 
@@ -117,8 +118,12 @@ function MacManShell({ detail, initialView = 'chat' }: MacManShellProps) {
 }
 
 export function MacManController() {
+  useEffect(() => {
+    document.title = 'MacMan'
+  }, [])
+
   return (
-    <ContribWiring>
+    <ContribWiring presentation="macman">
       <MacManShell detail={(view, navigate) => <MacManPages onNavigate={navigate} view={view} />} />
     </ContribWiring>
   )

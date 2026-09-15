@@ -185,7 +185,13 @@ export { WiredPane } from './context'
 // Only the RPCs issued by session creation follow the handoff's profile pin.
 const HANDOFF_CREATE_LEG_METHODS = new Set(['config.set', 'session.close', 'session.create'])
 
-export function ContribWiring({ children }: { children: ReactNode }) {
+export function ContribWiring({
+  children,
+  presentation = 'default'
+}: {
+  children: ReactNode
+  presentation?: 'default' | 'macman'
+}) {
   const queryClient = useQueryClient()
   const location = useLocation()
   const navigate = useNavigate()
@@ -1256,7 +1262,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
         {/* HUD and the popped-out Browser have no titlebar to hang these off —
             the clusters are `fixed`, so without this they'd float over the
             surface as orphaned buttons. */}
-        {!isHudWindow() && !isBrowserWindow() && (
+        {presentation === 'default' && !isHudWindow() && !isBrowserWindow() && (
           <TitlebarControls
             leftTools={leftTitlebarTools}
             onOpenSettings={() => navigate(SETTINGS_ROUTE)}
@@ -1268,16 +1274,16 @@ export function ContribWiring({ children }: { children: ReactNode }) {
 
       {/* The full real overlay set (mirrors DesktopController's `overlays`). */}
       <RemoteDisplayBanner />
-      {!isAuxiliaryWindow() && <DesktopInstallOverlay />}
-      {!isAuxiliaryWindow() && <IntroRevealGate enabled={gatewayState === 'open'} />}
-      {!isAuxiliaryWindow() && (
+      {!isAuxiliaryWindow() && <DesktopInstallOverlay productName={presentation === 'macman' ? 'MacMan' : 'Hermes'} />}
+      {presentation === 'default' && !isAuxiliaryWindow() && <IntroRevealGate enabled={gatewayState === 'open'} />}
+      {presentation === 'default' && !isAuxiliaryWindow() && (
         <OnboardingChatGate
           enabled={gatewayState === 'open'}
           onKickoff={kickoffFirstChat}
           requestGateway={ambientRequestGateway}
         />
       )}
-      {!isAuxiliaryWindow() && (
+      {presentation === 'default' && !isAuxiliaryWindow() && (
         <DesktopOnboardingOverlay
           enabled={gatewayState === 'open'}
           onCompleted={() => {
@@ -1407,12 +1413,12 @@ export function ContribWiring({ children }: { children: ReactNode }) {
 
       {/* Petdex floating mascot — renders nothing unless installed + enabled.
           Never in the HUD: that window is the chat bar and nothing else. */}
-      {!isHudWindow() && !isBrowserWindow() && <FloatingPet />}
+      {presentation === 'default' && !isHudWindow() && !isBrowserWindow() && <FloatingPet />}
 
       {/* In-app tips. Renders nothing until the app is quiet and has something
           to point at, and nothing at all once they're off or all retired. The
           HUD and browser windows have none of the surfaces a tip talks about. */}
-      {!isHudWindow() && !isBrowserWindow() && <TipHost />}
+      {presentation === 'default' && !isHudWindow() && !isBrowserWindow() && <TipHost />}
 
       {/* Single persistent xterm host chasing the terminal pane's slot rect.
           The HUD has no terminal pane, so it has nothing to chase. */}
