@@ -112,6 +112,30 @@ def test_missing_ack_gets_a_deterministic_receipt_before_delegation():
     asyncio.run(scenario())
 
 
+def test_attachment_only_turn_keeps_request_scoped_authorization():
+    async def scenario():
+        requests = []
+        executor = ConversationActionExecutor(
+            deliver=lambda _text: None,
+            delegate=lambda request: requests.append(request) or "worker-attachment",
+        )
+        turn = user_turn("")
+
+        await executor.execute(
+            turn,
+            [
+                {"name": "delegate", "arguments": {"task": "Describe the attached file"}},
+                {"name": "finish_turn", "arguments": {}},
+            ],
+        )
+
+        assert requests[0]["authorization"]["user_request"] == (
+            "[attachment-only request] Describe the attached file"
+        )
+
+    asyncio.run(scenario())
+
+
 def test_follow_up_delegation_preserves_the_selected_worker_identity():
     async def scenario():
         requests = []

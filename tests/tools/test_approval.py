@@ -121,6 +121,37 @@ class TestSmartApproval:
         assert result["approved"] is False
         assert "BLOCKED" in result["message"]
 
+    def test_explicit_request_escalation_never_opens_a_low_level_command_card(self, monkeypatch):
+        session_token = approval_context.set_current_session_key("macman-request")
+        request_token = approval_context.set_current_request_authorization(
+            source="explicit_desktop_user",
+            user_request="open Notes",
+            delegated_task="Open Notes on this Mac",
+        )
+        monkeypatch.setenv("HERMES_SESSION_PLATFORM", "desktop")
+        monkeypatch.setattr(
+            approval_context,
+            "_get_approval_config",
+            lambda: {"mode": "manual"},
+        )
+        monkeypatch.setattr(approval_smart, "_smart_approve", lambda *_args: "escalate")
+        monkeypatch.setattr(
+            "tools.tirith_security.check_command_security",
+            lambda _command: {"action": "allow", "findings": [], "summary": ""},
+        )
+        try:
+            result = approval_module.check_all_command_guards(
+                "python -c \"print('hello')\"",
+                "local",
+            )
+        finally:
+            approval_context.reset_current_request_authorization(request_token)
+            approval_context.reset_current_session_key(session_token)
+
+        assert result["approved"] is False
+        assert result.get("approval_pending") is not True
+        assert "semantic" in result["message"].lower()
+
     def test_smart_approval_does_not_allowlist_the_pattern_for_session(self, monkeypatch):
         session_key = "test-smart-per-command"
         command = "python -c \"print('hello')\""
