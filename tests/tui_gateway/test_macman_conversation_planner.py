@@ -114,6 +114,33 @@ def test_conversation_prompt_carries_the_human_hot_path_contract():
     asyncio.run(scenario())
 
 
+def test_conversation_prompt_uses_the_pinned_finn_identity_and_hot_path():
+    async def scenario():
+        captured = {}
+
+        async def complete(**kwargs):
+            captured.update(kwargs)
+            return _response(
+                ("send_message", {"text": "two secs"}),
+                ("delegate", {"task": "check tomorrow's weather"}),
+                ("finish_turn", {}),
+            )
+
+        planner = FinnConversationPlanner(complete=complete)
+        await planner.plan(
+            _envelope("user", "what's the weather tomorrow?"),
+            main_runtime={"model": "m"},
+        )
+
+        system_prompt = captured["messages"][0]["content"].lower()
+        assert "voice is the product" in system_prompt
+        assert "the trailing beat is the deepest tell you have" in system_prompt
+        assert "<hot_path>" in system_prompt
+        assert "hermes owns all computer work" in system_prompt
+
+    asyncio.run(scenario())
+
+
 def test_worker_turn_removes_delegate_from_the_available_tool_surface():
     async def scenario():
         captured = {}

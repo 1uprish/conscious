@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from tui_gateway.macman_conversation_planner import ConversationPlanError
 from tui_gateway.macman_conversation_runtime import MacManConversationRuntime
@@ -98,6 +99,31 @@ def test_user_plan_failure_fails_open_to_unchanged_hermes_with_exact_envelope():
 
         assert fallbacks == [turn]
         assert result == {"fallback": True}
+
+    asyncio.run(scenario())
+
+
+def test_planner_failure_is_logged_before_fail_open(caplog):
+    async def scenario():
+        class Planner:
+            async def plan(self, _envelope, *, main_runtime, conversation_context=None):
+                raise RuntimeError("provider rejected parallel tool calls")
+
+        runtime = MacManConversationRuntime(
+            planner=Planner(),
+            current_runtime=lambda: {"model": "current"},
+            deliver=lambda _text: None,
+            delegate=lambda _request: None,
+            fail_open=lambda _turn: None,
+        )
+
+        with caplog.at_level(logging.WARNING):
+            result = await runtime.handle(_turn(content="open Notes"))
+
+        assert result == {"fallback": True}
+        assert "Finn conversation planning failed" in caplog.text
+        assert "provider rejected parallel tool calls" in caplog.text
+        assert "message_id=one" in caplog.text
 
     asyncio.run(scenario())
 
