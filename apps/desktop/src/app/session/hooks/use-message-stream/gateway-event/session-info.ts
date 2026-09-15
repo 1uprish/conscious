@@ -125,6 +125,20 @@ function maybeRebindPaneToRebuiltRuntime(ctx: GatewayEventContext): boolean {
   setActiveSessionId(explicitSid)
   ctx.deps.activeSessionIdRef.current = explicitSid
 
+  // A replacement runtime starts with an empty client cache entry. Rebinding
+  // only the id therefore lets its first session.info publish that empty state
+  // into the shared chat view, erasing the transcript that was already on
+  // screen. Carry the settled state across before subsequent events arrive.
+  // Never overwrite a replacement runtime that has already received events:
+  // those messages are newer than the retired runtime's snapshot.
+  if (oldState && !deps.sessionStateByRuntimeIdRef.current.has(explicitSid)) {
+    deps.updateSessionState(
+      explicitSid,
+      () => ({ ...oldState, storedSessionId: payload.stored_session_id }),
+      payload.stored_session_id
+    )
+  }
+
   return true
 }
 
