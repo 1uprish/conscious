@@ -28,7 +28,7 @@ class HermesWorkerBridge:
         self,
         *,
         make_agent: Callable[[str], Any],
-        worker_scope: Callable[[str], Any],
+        worker_scope: Callable[[str, dict], Any],
         build_message: Callable[[Any, str, list[dict]], Any],
         on_result: Callable[[dict], object],
         load_history: Callable[[str], list[dict]] | None = None,
@@ -90,7 +90,7 @@ class HermesWorkerBridge:
         def run() -> None:
             agent = None
             try:
-                with self._worker_scope(worker_id):
+                with self._worker_scope(worker_id, request):
                     history = self._load_history(worker_id) if resumed and self._load_history else []
                     agent = self._make_agent(worker_id)
                     # The conversational layer, not Hermes' raw stream, owns visible prose.

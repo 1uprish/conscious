@@ -196,18 +196,33 @@ class MacManConversationActor:
             raise RuntimeError("Hermes agent is not ready")
 
         @contextlib.contextmanager
-        def worker_scope(worker_id: str):
-            from tools.approval_context import reset_current_session_key, set_current_session_key
-
-            session_tokens = self.server._set_session_context(
-                worker_id,
-                cwd=self.server._session_cwd(session),
-                ui_session_id=sid,
+        def worker_scope(worker_id: str, worker_request: dict):
+            from tools.approval_context import (
+                reset_current_request_authorization,
+                reset_current_session_key,
+                set_current_request_authorization,
+                set_current_session_key,
             )
-            # Approval remains owned by the visible session, whose existing callback and
-            # renderer card can actually resolve it. Hermes' worker session stays separate.
-            approval_token = set_current_session_key(str(session.get("session_key") or ""))
+
+            authorization = worker_request.get("authorization")
+            if not isinstance(authorization, dict):
+                raise RuntimeError("MacMan worker is missing request authorization")
+
+            request_token = approval_token = session_tokens = None
             try:
+                request_token = set_current_request_authorization(
+                    source=authorization.get("source"),
+                    user_request=authorization.get("user_request"),
+                    delegated_task=authorization.get("delegated_task"),
+                )
+                session_tokens = self.server._set_session_context(
+                    worker_id,
+                    cwd=self.server._session_cwd(session),
+                    ui_session_id=sid,
+                )
+                # Recoverable command risk is assessed against this request. Approval
+                # identity remains the visible session; Hermes' worker identity is separate.
+                approval_token = set_current_session_key(str(session.get("session_key") or ""))
                 with self.server._session_profile_runtime_scope(session):
                     self.server._wire_callbacks(sid)
                     parent_db = getattr(parent_agent, "_session_db", None)
@@ -216,8 +231,12 @@ class MacManConversationActor:
                         yield
             finally:
                 self._worker_local.db = None
-                reset_current_session_key(approval_token)
-                self.server._clear_session_context(session_tokens)
+                if approval_token is not None:
+                    reset_current_session_key(approval_token)
+                if session_tokens is not None:
+                    self.server._clear_session_context(session_tokens)
+                if request_token is not None:
+                    reset_current_request_authorization(request_token)
 
         def make_agent(worker_id: str):
             from run_agent import AIAgent

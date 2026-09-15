@@ -6,6 +6,7 @@ gate in :mod:`tools.approval`.
 """
 
 import contextvars
+from dataclasses import dataclass
 import logging
 import os
 from hermes_cli.config import cfg_get
@@ -32,6 +33,50 @@ _approval_session_id: contextvars.ContextVar[str] = _ctx("approval_session_id")
 # it onto the non-interactive auto-approve path so a dangerous command runs without the approval callback firing
 # (GHSA-96vc-wcxf-jjff). None = unset → env fallback.
 _hermes_interactive_ctx: contextvars.ContextVar[str | None] = _ctx("hermes_interactive", None)
+
+
+@dataclass(frozen=True)
+class RequestAuthorization:
+    """Trusted authority carried from one explicit desktop request into its worker."""
+
+    source: str
+    user_request: str
+    delegated_task: str
+
+
+_request_authorization: contextvars.ContextVar[RequestAuthorization | None] = contextvars.ContextVar(
+    "request_authorization",
+    default=None,
+)
+
+
+def set_current_request_authorization(
+    *, source: object, user_request: object, delegated_task: object,
+) -> contextvars.Token[RequestAuthorization | None]:
+    """Bind explicit request authority to the current worker context only."""
+    if source != "explicit_desktop_user":
+        raise ValueError("unsupported request authorization source")
+    if not isinstance(user_request, str) or not user_request.strip():
+        raise ValueError("authorized user request must be non-empty text")
+    if not isinstance(delegated_task, str) or not delegated_task.strip():
+        raise ValueError("authorized delegated task must be non-empty text")
+    return _request_authorization.set(RequestAuthorization(
+        source=source,
+        user_request=user_request.strip(),
+        delegated_task=delegated_task.strip(),
+    ))
+
+
+def reset_current_request_authorization(
+    token: contextvars.Token[RequestAuthorization | None],
+) -> None:
+    """Restore the previous request authority when a worker scope exits."""
+    _request_authorization.reset(token)
+
+
+def get_current_request_authorization() -> RequestAuthorization | None:
+    """Return the explicit request governing the current worker, if any."""
+    return _request_authorization.get()
 
 
 def set_hermes_interactive_context(interactive: bool) -> contextvars.Token:
@@ -233,7 +278,10 @@ def _get_approval_mode() -> str:
             return room_policy.approval_mode
     except Exception:
         pass
-    return _normalize_approval_mode(_get_approval_config().get("mode", "manual"))
+    mode = _normalize_approval_mode(_get_approval_config().get("mode", "manual"))
+    if mode == "manual" and get_current_request_authorization() is not None:
+        return "smart"
+    return mode
 
 
 def _get_approval_timeout() -> int:

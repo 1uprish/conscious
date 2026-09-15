@@ -103,6 +103,15 @@ class ConversationActionExecutor:
                     "channel": envelope.get("channel", ""),
                     "thread_id": envelope.get("thread_id", ""),
                 }
+                raw_user_request = envelope.get("content")
+                user_request = raw_user_request.strip() if isinstance(raw_user_request, str) else ""
+                if not user_request:
+                    user_request = f"[attachment-only request] {request['task']}"
+                request["authorization"] = {
+                    "source": "explicit_desktop_user",
+                    "user_request": user_request,
+                    "delegated_task": request["task"],
+                }
                 if arguments.get("worker_id") is not None:
                     request["worker_id"] = _non_empty_text(
                         arguments.get("worker_id"), "delegate worker_id",

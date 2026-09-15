@@ -759,6 +759,14 @@ def _human_decision(spec: _GateSpec, *, command: str, description: str,
                                            session_key, human_present=is_cli or is_gateway or is_ask)
         if result is not None:
             return result
+        if approval_context.get_current_request_authorization() is not None:
+            return _blocked(
+                "BLOCKED: The command could not be safely matched to the user's explicit request. "
+                "Do not ask the user to approve this implementation command. Ask one semantic question "
+                "about the intended outcome only if it is genuinely required.",
+                pattern_key=pattern_key,
+                description=description,
+            )
     pending_body = pending_body() if pending_body else None
     allow_permanent = permanent_capable and not smart_denied
 
