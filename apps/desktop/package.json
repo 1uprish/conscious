@@ -1,10 +1,10 @@
 {
-  "name": "hermes",
-  "productName": "Hermes",
+  "name": "macman",
+  "productName": "MacMan",
   "private": true,
   "version": "0.17.3",
-  "description": "Native desktop shell for Hermes Agent.",
-  "author": "Nous Research",
+  "description": "MacMan personal assistant for macOS.",
+  "author": "Conscious Gadgets",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/NousResearch/hermes-agent.git"
@@ -189,18 +189,19 @@
   },
   "build": {
     "electronVersion": "40.10.2",
-    "appId": "com.nousresearch.hermes",
-    "productName": "Hermes",
-    "executableName": "Hermes",
+    "appId": "com.consciousgadgets.macman",
+    "productName": "MacMan",
+    "executableName": "MacMan",
     "protocols": [
       {
-        "name": "Hermes Protocol",
+        "name": "MacMan Protocol",
         "schemes": [
+          "macman",
           "hermes"
         ]
       }
     ],
-    "artifactName": "Hermes-${version}-${os}-${arch}.${ext}",
+    "artifactName": "MacMan-${version}-${os}-${arch}.${ext}",
     "icon": "assets/icon",
     "directories": {
       "output": "release"
@@ -236,19 +237,19 @@
       "entitlements": "electron/entitlements.mac.plist",
       "entitlementsInherit": "electron/entitlements.mac.inherit.plist",
       "extendInfo": {
-        "CFBundleDisplayName": "Hermes",
-        "CFBundleExecutable": "Hermes",
-        "CFBundleName": "Hermes",
-        "NSAudioCaptureUsageDescription": "Hermes uses audio capture for voice conversations.",
-        "NSCameraUsageDescription": "Hermes uses the camera when a plugin or feature you enable requests it.",
-        "NSMicrophoneUsageDescription": "Hermes uses the microphone for voice input and voice conversations.",
-        "NSCalendarsUsageDescription": "Hermes needs access to Calendar to provide requested meeting and scheduling support.",
-        "NSCalendarsFullAccessUsageDescription": "Hermes needs full access to Calendar to read and manage events when explicitly requested.",
-        "NSRemindersUsageDescription": "Hermes needs access to Reminders to provide requested personal-assistant and scheduling support.",
-        "NSRemindersFullAccessUsageDescription": "Hermes needs full access to Reminders to read and manage reminders when explicitly requested.",
-        "NSScreenCaptureUsageDescription": "Hermes captures the screen when you ask the agent to screenshot or record it.",
-        "NSLocalNetworkUsageDescription": "Hermes connects to devices on your local network when a plugin or feature you enable requests it.",
-        "NSAppleMusicUsageDescription": "Hermes accesses your music library when a plugin or feature you enable requests it."
+        "CFBundleDisplayName": "MacMan",
+        "CFBundleExecutable": "MacMan",
+        "CFBundleName": "MacMan",
+        "NSAudioCaptureUsageDescription": "MacMan uses audio capture for voice conversations.",
+        "NSCameraUsageDescription": "MacMan uses the camera when a plugin or feature you enable requests it.",
+        "NSMicrophoneUsageDescription": "MacMan uses the microphone for voice input and voice conversations.",
+        "NSCalendarsUsageDescription": "MacMan needs access to Calendar to provide requested meeting and scheduling support.",
+        "NSCalendarsFullAccessUsageDescription": "MacMan needs full access to Calendar to read and manage events when explicitly requested.",
+        "NSRemindersUsageDescription": "MacMan needs access to Reminders to provide requested personal-assistant and scheduling support.",
+        "NSRemindersFullAccessUsageDescription": "MacMan needs full access to Reminders to read and manage reminders when explicitly requested.",
+        "NSScreenCaptureUsageDescription": "MacMan captures the screen when you ask it to screenshot or record it.",
+        "NSLocalNetworkUsageDescription": "MacMan connects to devices on your local network when a plugin or feature you enable requests it.",
+        "NSAppleMusicUsageDescription": "MacMan accesses your music library when a plugin or feature you enable requests it."
       },
       "gatekeeperAssess": false,
       "hardenedRuntime": true,
@@ -258,7 +259,7 @@
       ]
     },
     "dmg": {
-      "title": "Install Hermes",
+      "title": "Install MacMan",
       "backgroundColor": "#f5f5f7",
       "iconSize": 96,
       "window": {
@@ -280,7 +281,7 @@
       ]
     },
     "win": {
-      "legalTrademarks": "Hermes",
+      "legalTrademarks": "MacMan",
       "target": [
         "nsis",
         "msi"
@@ -290,7 +291,7 @@
     "linux": {
       "category": "Development",
       "maintainer": "Nous Research <support@nousresearch.com>",
-      "synopsis": "Native desktop shell for Hermes Agent.",
+      "synopsis": "MacMan personal assistant.",
       "target": [
         "AppImage",
         "deb",
@@ -301,8 +302,8 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "perMachine": false,
-      "shortcutName": "Hermes",
-      "uninstallDisplayName": "Hermes",
+      "shortcutName": "MacMan",
+      "uninstallDisplayName": "MacMan",
       "warningsAsErrors": false
     }
   }
