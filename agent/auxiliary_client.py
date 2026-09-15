@@ -3414,7 +3414,7 @@ def _prepare_same_provider_retry(
     resolved_base_url: Optional[str], resolved_api_key: Optional[str],
     resolved_api_mode: Optional[str], main_runtime: Optional[Dict[str, Any]],
     final_model: Optional[str], messages: list, temperature: Optional[float],
-    max_tokens: Optional[int], tools: Optional[list], effective_timeout: float,
+    max_tokens: Optional[int], tools: Optional[list], tool_choice: Any, effective_timeout: float,
     effective_extra_body: dict, reasoning_config: Optional[dict], async_mode: bool,
     extra_headers: Optional[Dict[str, str]] = None,
 ) -> Tuple[Any, Dict[str, Any]]:
@@ -3438,6 +3438,7 @@ def _prepare_same_provider_retry(
     retry_kwargs = _build_call_kwargs(
         effective_provider or resolved_provider, retry_model or final_model, messages,
         temperature=temperature, max_tokens=max_tokens, tools=tools, timeout=effective_timeout,
+        tool_choice=tool_choice,
         extra_body=effective_extra_body, reasoning_config=reasoning_config,
         base_url=retry_base or resolved_base_url, task=task,
     )
@@ -3672,6 +3673,7 @@ def _replan_synchronous_cache_sections(
 def _fallback_request_kwargs(
     destination: _FallbackDestination, *, task: Optional[str], messages: list,
     tools: Optional[list], temperature: Optional[float], max_tokens: Optional[int],
+    tool_choice: Any,
     effective_timeout: float, effective_extra_body: dict, reasoning_config: Optional[dict],
     fallback_entry: dict, task_config: dict, apply_fast_lane: bool,
 ) -> Dict[str, Any]:
@@ -3688,6 +3690,7 @@ def _fallback_request_kwargs(
     fb_kwargs = _build_call_kwargs(
         destination.provider, destination.model, fallback_messages,
         temperature=temperature, max_tokens=fallback_max_tokens, tools=fallback_tools, timeout=effective_timeout,
+        tool_choice=tool_choice,
         extra_body=fallback_extra_body, reasoning_config=reasoning_config, base_url=destination.base_url, task=task)
     return fb_kwargs
 
@@ -3763,6 +3766,7 @@ def _call_fallback_candidate_sync(
     fb_client: Any, fb_model: Optional[str], fb_label: str, *, task: Optional[str], messages: list,
     temperature: Optional[float], max_tokens: Optional[int], tools: Optional[list],
     effective_timeout: float, effective_extra_body: dict, reasoning_config: Optional[dict],
+    tool_choice: Any = None,
 ) -> Optional[Any]:
     """Call one fallback candidate with stale-credential recovery: on an auth error refresh its
     credentials and retry once with a rebuilt client; if that also auth-fails, quarantine the
@@ -3775,7 +3779,7 @@ def _call_fallback_candidate_sync(
     destination, fb_kwargs, rebuild = _plan_fallback_candidate(
         fb_client, fb_model, fb_label, task=task, effective_timeout=effective_timeout,
         apply_fast_lane=True, messages=messages, tools=tools, temperature=temperature,
-        max_tokens=max_tokens, effective_extra_body=effective_extra_body,
+        max_tokens=max_tokens, tool_choice=tool_choice, effective_extra_body=effective_extra_body,
         reasoning_config=reasoning_config,
     )
 
@@ -3815,12 +3819,13 @@ async def _call_fallback_candidate_async(
     fb_client: Any, fb_model: Optional[str], fb_label: str, *, task: Optional[str], messages: list,
     temperature: Optional[float], max_tokens: Optional[int], tools: Optional[list],
     effective_timeout: float, effective_extra_body: dict, reasoning_config: Optional[dict],
+    tool_choice: Any = None,
 ) -> Optional[Any]:
     """Async mirror of :func:`_call_fallback_candidate_sync` (no fast-lane cap on this wire)."""
     destination, fb_kwargs, rebuild = _plan_fallback_candidate(
         fb_client, fb_model, fb_label, task=task, effective_timeout=effective_timeout,
         apply_fast_lane=False, messages=messages, tools=tools, temperature=temperature,
-        max_tokens=max_tokens, effective_extra_body=effective_extra_body,
+        max_tokens=max_tokens, tool_choice=tool_choice, effective_extra_body=effective_extra_body,
         reasoning_config=reasoning_config,
     )
 
@@ -6137,6 +6142,7 @@ def _merge_aux_extra_body(
 def _build_call_kwargs(
     provider: str, model: str, messages: list, temperature: Optional[float] = None,
     max_tokens: Optional[int] = None, tools: Optional[list] = None, timeout: float = 30.0,
+    tool_choice: Any = None,
     extra_body: Optional[dict] = None, reasoning_config: Optional[dict] = None,
     base_url: Optional[str] = None, task: Optional[str] = None,
 ) -> dict:
@@ -6159,6 +6165,8 @@ def _build_call_kwargs(
         kwargs.update(auxiliary_max_tokens_param(max_tokens, model=model))  # picks max_completion_tokens where needed
     if tools:
         kwargs["tools"] = _dedupe_tool_names(tools, provider, model)
+        if tool_choice is not None:
+            kwargs["tool_choice"] = tool_choice
     # Provider profiles are the source of truth for reasoning wire shapes (top-level, nested body,
     # or extra_body.reasoning); providers without a reasoning-aware profile keep the generic
     # ``extra_body.reasoning`` fallback.
@@ -6777,7 +6785,7 @@ _PreparedAuxRequest = NamedTuple("_PreparedAuxRequest", [
 def _prepare_aux_request(
     task: Optional[str], *, provider: Optional[str], model: Optional[str], base_url: Optional[str],
     api_key: Optional[str], main_runtime: Dict[str, Any], messages: list,
-    temperature: Optional[float], max_tokens: Optional[int], tools: Optional[list],
+    temperature: Optional[float], max_tokens: Optional[int], tools: Optional[list], tool_choice: Any,
     timeout: Optional[float], extra_body: Optional[dict], reasoning_config: Optional[dict],
     extra_headers: Optional[Dict[str, str]], api_mode: Optional[str],
     route_info: Optional[Dict[str, str]], async_mode: bool,
@@ -6821,7 +6829,7 @@ def _prepare_aux_request(
     # auto-detected routes (api.moonshot.ai vs api.kimi.com/coding).
     kwargs = _build_call_kwargs(
         request_provider, final_model, messages, temperature=temperature, max_tokens=max_tokens,
-        tools=tools, timeout=effective_timeout, extra_body=effective_extra_body,
+        tools=tools, tool_choice=tool_choice, timeout=effective_timeout, extra_body=effective_extra_body,
         reasoning_config=reasoning_config, base_url=base_info or resolved_base_url, task=task)
     if extra_headers:
         kwargs["extra_headers"] = dict(extra_headers)
@@ -7224,6 +7232,7 @@ def call_llm(
     task: str = None, *, provider: str = None, model: str = None, base_url: str = None,
     api_key: str = None, main_runtime: Optional[Dict[str, Any]] = None, messages: list,
     temperature: Optional[float] = None, max_tokens: int = None, tools: list = None,
+    tool_choice: Any = None,
     timeout: float = None, extra_body: dict = None, reasoning_config: Optional[dict] = None,
     extra_headers: Optional[Dict[str, str]] = None, api_mode: str = None, stream: bool = False,
     stream_options: dict = None, route_info: Optional[Dict[str, str]] = None,
@@ -7253,7 +7262,8 @@ def call_llm(
             response = _call_llm_impl(
                 task=task, provider=provider, model=model, base_url=base_url, api_key=api_key,
                 main_runtime=main_runtime, messages=messages, temperature=temperature,
-                max_tokens=max_tokens, tools=tools, timeout=timeout, extra_body=extra_body,
+                max_tokens=max_tokens, tools=tools, tool_choice=tool_choice,
+                timeout=timeout, extra_body=extra_body,
                 reasoning_config=reasoning_config, extra_headers=extra_headers, api_mode=api_mode,
                 stream=stream, stream_options=stream_options, route_info=route_info,
             )
@@ -7286,6 +7296,7 @@ def _plan_aux_call(
     task: Optional[str], *, async_mode: bool, provider: Optional[str], model: Optional[str],
     base_url: Optional[str], api_key: Optional[str], main_runtime: Optional[Dict[str, Any]],
     messages: list, temperature: Optional[float], max_tokens: Optional[int], tools: Optional[list],
+    tool_choice: Any,
     timeout: Optional[float], extra_body: Optional[dict], reasoning_config: Optional[dict],
     extra_headers: Optional[Dict[str, str]], api_mode: Optional[str],
     route_info: Optional[Dict[str, str]],
@@ -7298,13 +7309,14 @@ def _plan_aux_call(
     req = _prepare_aux_request(
         task, provider=provider, model=model, base_url=base_url, api_key=api_key,
         main_runtime=main_runtime, messages=messages, temperature=temperature,
-        max_tokens=max_tokens, tools=tools, timeout=timeout, extra_body=extra_body,
+        max_tokens=max_tokens, tools=tools, tool_choice=tool_choice,
+        timeout=timeout, extra_body=extra_body,
         reasoning_config=reasoning_config, extra_headers=extra_headers,
         api_mode=api_mode, route_info=route_info, async_mode=async_mode,
     )
     candidate_kwargs = dict(
         task=task, messages=messages, temperature=temperature, max_tokens=max_tokens,
-        tools=tools, effective_timeout=req.effective_timeout,
+        tools=tools, tool_choice=tool_choice, effective_timeout=req.effective_timeout,
         effective_extra_body=req.effective_extra_body, reasoning_config=reasoning_config,
     )
     retry_kwargs = dict(
@@ -7358,6 +7370,7 @@ def _call_llm_impl(
     task: str = None, *, provider: str = None, model: str = None, base_url: str = None,
     api_key: str = None, main_runtime: Optional[Dict[str, Any]] = None, messages: list,
     temperature: Optional[float] = None, max_tokens: int = None, tools: list = None,
+    tool_choice: Any = None,
     timeout: float = None, extra_body: dict = None, reasoning_config: Optional[dict] = None,
     extra_headers: Optional[Dict[str, str]] = None, api_mode: str = None, stream: bool = False,
     stream_options: dict = None, route_info: Optional[Dict[str, str]] = None,
@@ -7370,7 +7383,8 @@ def _call_llm_impl(
     req, retry_kwargs, candidate_kwargs = _plan_aux_call(
         task, async_mode=False, provider=provider, model=model, base_url=base_url,
         api_key=api_key, main_runtime=main_runtime, messages=messages,
-        temperature=temperature, max_tokens=max_tokens, tools=tools, timeout=timeout,
+        temperature=temperature, max_tokens=max_tokens, tools=tools, tool_choice=tool_choice,
+        timeout=timeout,
         extra_body=extra_body, reasoning_config=reasoning_config,
         extra_headers=extra_headers, api_mode=api_mode, route_info=route_info,
     )
@@ -7524,6 +7538,7 @@ async def async_call_llm(
     task: str = None, *, provider: str = None, model: str = None, base_url: str = None,
     api_key: str = None, main_runtime: Optional[Dict[str, Any]] = None, messages: list,
     temperature: Optional[float] = None, max_tokens: int = None, tools: list = None,
+    tool_choice: Any = None,
     timeout: float = None, extra_body: dict = None, reasoning_config: Optional[dict] = None,
     route_info: Optional[Dict[str, str]] = None,
 ) -> Any:
@@ -7535,7 +7550,8 @@ async def async_call_llm(
         return await _async_call_llm_impl(
             task=task, provider=provider, model=model, base_url=base_url, api_key=api_key,
             main_runtime=main_runtime, messages=messages, temperature=temperature,
-            max_tokens=max_tokens, tools=tools, timeout=timeout, extra_body=extra_body,
+            max_tokens=max_tokens, tools=tools, tool_choice=tool_choice,
+            timeout=timeout, extra_body=extra_body,
             reasoning_config=reasoning_config, route_info=route_info,
         )
     finally:
@@ -7547,6 +7563,7 @@ async def _async_call_llm_impl(
     task: str = None, *, provider: str = None, model: str = None, base_url: str = None,
     api_key: str = None, main_runtime: Optional[Dict[str, Any]] = None, messages: list,
     temperature: Optional[float] = None, max_tokens: int = None, tools: list = None,
+    tool_choice: Any = None,
     timeout: float = None, extra_body: dict = None, reasoning_config: Optional[dict] = None,
     route_info: Optional[Dict[str, str]] = None,
 ) -> Any:
@@ -7555,7 +7572,8 @@ async def _async_call_llm_impl(
     req, retry_kwargs, candidate_kwargs = _plan_aux_call(
         task, async_mode=True, provider=provider, model=model, base_url=base_url,
         api_key=api_key, main_runtime=main_runtime, messages=messages,
-        temperature=temperature, max_tokens=max_tokens, tools=tools, timeout=timeout,
+        temperature=temperature, max_tokens=max_tokens, tools=tools, tool_choice=tool_choice,
+        timeout=timeout,
         extra_body=extra_body, reasoning_config=reasoning_config,
         extra_headers=None, api_mode=None, route_info=route_info,
     )

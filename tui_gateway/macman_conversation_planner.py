@@ -206,6 +206,8 @@ class FinnConversationPlanner:
             temperature=0.2,
             max_tokens=320,
             tools=self._tools(source),
+            tool_choice="required",
+            reasoning_config={"enabled": False},
             timeout=20.0,
         )
         if inspect.isawaitable(response):
